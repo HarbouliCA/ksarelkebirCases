@@ -20,6 +20,21 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// CORS Configuration - Allow frontend from various domains
+const corsOptions = {
+  origin: [
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'http://localhost:5173', // Vite default
+    'https://ksarelkebirCases.vercel.app',
+    'https://ksarapp.sagafit.es',
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  optionsSuccessStatus: 200
+};
+
 // Middleware
 app.use(helmet({
   contentSecurityPolicy: {
@@ -32,7 +47,7 @@ app.use(helmet({
     },
   },
 })); // Security headers with relaxed CSP for development
-app.use(cors()); // Enable CORS
+app.use(cors(corsOptions)); // Enable CORS with specific origins
 app.use(morgan('combined')); // Request logging
 app.use(express.json()); // Parse JSON bodies
 app.use(express.urlencoded({ extended: true })); // Parse form data

@@ -1,5 +1,16 @@
-// API Helper Functions
-const API_BASE = ''; // Relative to current domain
+// API Helper Functions - Dynamic Backend URL
+const getApiBase = () => {
+  // Production: Vercel/Custom domain calls Railway backend
+  if (window.location.hostname.includes('vercel.app') || 
+      window.location.hostname === 'ksarapp.sagafit.es') {
+    // Replace with your actual Railway URL after deployment
+    return 'https://ksarelkebirCases-production.up.railway.app/api';
+  }
+  // Development: Use relative path (localhost:3000)
+  return '/api';
+};
+
+const API_BASE = getApiBase();
 
 export async function apiCall(endpoint, options = {}) {
   const token = localStorage.getItem('authToken');
@@ -14,7 +25,8 @@ export async function apiCall(endpoint, options = {}) {
   }
 
   try {
-    const response = await fetch(`/api${endpoint}`, {
+    const url = API_BASE.startsWith('/') ? `${API_BASE}${endpoint}` : `${API_BASE}${endpoint}`;
+    const response = await fetch(url, {
       ...options,
       headers
     });

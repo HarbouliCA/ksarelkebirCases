@@ -101,23 +101,25 @@ This approach gives you:
 
 ### Step 3: Load Database Schema
 
-1. **In Railway PostgreSQL service**
-   - Click "Connect"
-   - Look for "Connect via PostgreSQL CLI" section
-   - Copy the connection string
+**Use Railway Web Console (Recommended):**
 
-2. **In your local terminal**
-   ```bash
-   # Save schema to file if not already done
-   psql "your-railway-database-url" < src/db/schema.sql
-   ```
+1. **In Railway dashboard**
+   - Click on PostgreSQL service
+   - Go to "Query" tab (top menu)
 
-3. **Or use Railway web console**
-   - In Railway dashboard
-   - PostgreSQL service → "Query" tab
-   - Copy all SQL from `src/db/schema.sql`
-   - Paste into query editor
+2. **In your local editor**
+   - Open `src/db/schema.sql`
+   - Select all (Ctrl+A)
+   - Copy
+
+3. **In Railway Query tab**
+   - Paste the SQL code
    - Click "Execute"
+   - Wait for "Queries executed successfully" message
+
+4. **Verify tables created**
+   - Go to "Data" tab in Railway
+   - You should see tables: users, people, cases, aid_types, case_aid_types, notes, case_history, activity_logs
 
 ### Step 4: Deploy Node.js Backend
 

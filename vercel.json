@@ -1,0 +1,34 @@
+{
+  "buildCommand": "echo 'Frontend deployment'",
+  "outputDirectory": "public",
+  "routes": [
+    {
+      "src": "/index.html",
+      "dest": "/index.html"
+    },
+    {
+      "src": "/dashboard.html",
+      "dest": "/dashboard.html"
+    },
+    {
+      "src": "/people.html",
+      "dest": "/people.html"
+    },
+    {
+      "src": "/history.html",
+      "dest": "/history.html"
+    },
+    {
+      "src": "/css/(.*)",
+      "dest": "/css/$1"
+    },
+    {
+      "src": "/js/(.*)",
+      "dest": "/js/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
+    }
+  ]
+}

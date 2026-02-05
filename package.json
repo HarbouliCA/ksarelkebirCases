@@ -7,7 +7,8 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "setup-db": "node src/db/setup.js"
+    "setup-db": "node src/db/setup.js",
+    "build": "echo 'No build step needed for backend'"
   },
   "keywords": [
     "ksar",

@@ -1,8 +1,8 @@
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
-import dotenv from 'dotenv';
 import { connectDB, disconnectDB } from './src/db/db.js';
 import { errorHandler, notFoundHandler } from './src/middleware/errorHandler.js';
 import authRoutes from './src/routes/auth.js';
@@ -13,9 +13,6 @@ import aidTypesRoutes from './src/routes/aid-types.js';
 import notesRoutes from './src/routes/notes.js';
 import caseHistoryRoutes from './src/routes/case-history.js';
 import caseAidTypesRoutes from './src/routes/case-aid-types.js';
-
-// Load environment variables
-dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -100,7 +97,7 @@ async function start() {
     console.log('🔄 Attempting database connection...');
     await connectDB();
     console.log('✅ Database connected');
-    
+
     app.listen(PORT, () => {
       console.log(`\n🚀 Server running at http://localhost:${PORT}`);
       console.log(`📱 Frontend: http://localhost:${PORT}`);
@@ -110,15 +107,15 @@ async function start() {
     });
   } catch (error) {
     console.error('⚠️  Database connection error:', error.message);
-    
+
     if (process.env.NODE_ENV === 'production') {
       console.error('❌ Production mode: Cannot start without database');
       process.exit(1);
     }
-    
+
     console.log('📝 Development mode: Starting server without database connection');
     console.log('⚠️  API endpoints will fail until database is configured\n');
-    
+
     app.listen(PORT, () => {
       console.log(`\n🚀 Server running at http://localhost:${PORT}`);
       console.log(`📱 Frontend: http://localhost:${PORT}`);

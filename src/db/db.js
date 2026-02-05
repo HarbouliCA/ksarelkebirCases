@@ -1,21 +1,22 @@
 import pkg from 'pg';
 const { Client } = pkg;
 import dotenv from 'dotenv';
-import ConnectionString from 'pg-connection-string';
 
 dotenv.config();
 
-// Parse PostgreSQL connection string
-const cs = new ConnectionString(process.env.DATABASE_URL);
+const connectionString = process.env.DATABASE_URL;
+
+if (!connectionString) {
+  console.error('❌ DATABASE_URL is not defined in environment variables');
+  if (process.env.NODE_ENV === 'production') {
+    process.exit(1);
+  }
+}
 
 const dbConfig = {
-  host: cs.host,
-  port: cs.port,
-  database: cs.database,
-  user: cs.user,
-  password: cs.password,
+  connectionString: connectionString,
   ssl: {
-    rejectUnauthorized: false // Development: accept self-signed certificates
+    rejectUnauthorized: false
   }
 };
 

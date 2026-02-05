@@ -1,43 +1,38 @@
 import pkg from 'pg';
-const { Client } = pkg;
-import dotenv from 'dotenv';
-
-dotenv.config();
+const { Pool } = pkg; // Using Pool instead of Client for better production performance
+import 'dotenv/config';
 
 const connectionString = process.env.DATABASE_URL;
 
-if (!connectionString) {
-  console.error('❌ DATABASE_URL is not defined in environment variables');
-  if (process.env.NODE_ENV === 'production') {
-    process.exit(1);
-  }
-}
-
-const dbConfig = {
+const poolConfig = {
   connectionString: connectionString,
   ssl: {
     rejectUnauthorized: false
   }
 };
 
-export const client = new Client(dbConfig);
+export const client = new Pool(poolConfig);
 
 export async function connectDB() {
+  if (!connectionString) {
+    throw new Error('DATABASE_URL is not defined in environment variables. Please check your Railway/Production settings.');
+  }
+
   try {
-    await client.connect();
-    console.log('✅ Database connected');
+    const res = await client.query('SELECT NOW()');
+    console.log('✅ Database connected at:', res.rows[0].now);
   } catch (error) {
     console.error('❌ Database connection failed:', error.message);
-    process.exit(1);
+    throw error;
   }
 }
 
 export async function disconnectDB() {
   try {
     await client.end();
-    console.log('✅ Database disconnected');
+    console.log('✅ Database connection pool closed');
   } catch (error) {
-    console.error('❌ Error disconnecting database:', error.message);
+    console.error('❌ Error closing database pool:', error.message);
   }
 }
 

@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ksar El Kebir - Login</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Montserrat:wght@700&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+
+<body>
+  <div class="login-container">
+    <div class="login-box animate-fade">
+      <h2>Ksar El Kebir</h2>
+      <p class="subtitle">Case Management System</p>
+
+      <!-- Login Form -->
+      <div id="loginForm">
+        <div class="form-group">
+          <label for="loginEmail">Email Address</label>
+          <input type="email" id="loginEmail" placeholder="admin@ksarapp.com" required>
+        </div>
+        <div class="form-group">
+          <label for="loginPassword">Password</label>
+          <input type="password" id="loginPassword" placeholder="••••••••" required>
+        </div>
+        <div class="form-actions" style="flex-direction: column;">
+          <button class="btn-primary" id="loginBtn" style="width: 100%;">Sign In</button>
+          <p style="text-align: center; margin-top: 1rem; font-size: 0.875rem;">
+            No account? <a href="#" id="toggleToRegister"
+              style="color: var(--primary); font-weight: 600; text-decoration: none;">Create one</a>
+          </p>
+        </div>
+        <p id="loginMessage" class="message"></p>
+      </div>
+
+      <!-- Register Form -->
+      <div id="registerForm" style="display: none;">
+        <div class="form-group">
+          <label for="registerName">Full Name</label>
+          <input type="text" id="registerName" placeholder="Your Name" required>
+        </div>
+        <div class="form-group">
+          <label for="registerEmail">Email</label>
+          <input type="email" id="registerEmail" placeholder="your@email.com" required>
+        </div>
+        <div class="form-group">
+          <label for="registerPassword">Password</label>
+          <input type="password" id="registerPassword" placeholder="At least 6 characters" required>
+        </div>
+        <div class="form-group">
+          <label for="registerConfirm">Confirm Password</label>
+          <input type="password" id="registerConfirm" placeholder="Confirm your password" required>
+        </div>
+        <div class="form-actions" style="flex-direction: column;">
+          <button class="btn-primary" id="registerBtn" style="width: 100%;">Create Account</button>
+          <p style="text-align: center; margin-top: 1rem; font-size: 0.875rem;">
+            Already have an account? <a href="#" id="toggleToLogin"
+              style="color: var(--primary); font-weight: 600; text-decoration: none;">Sign in</a>
+          </p>
+        </div>
+        <p id="registerMessage" class="message"></p>
+      </div>
+
+      <!-- Demo Credentials -->
+      <div
+        style="margin-top: 2rem; padding: 1.25rem; background: rgba(255,255,255,0.4); border-radius: var(--radius-md); font-size: 13px; color: #4b5563; border: 1px solid rgba(255,255,255,0.2);">
+        <strong style="color: var(--text-main);">Access Info:</strong><br>
+        Email: <code
+          style="background: rgba(255,255,255,0.6); padding: 2px 4px; border-radius: 4px;">admin@ksarapp.com</code><br>
+        Pwd: <code style="background: rgba(255,255,255,0.6); padding: 2px 4px; border-radius: 4px;">admin123</code>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { login, register } from '/js/auth.js';
+
+    // Get DOM elements
+    const loginBtn = document.getElementById('loginBtn');
+    const registerBtn = document.getElementById('registerBtn');
+    const toggleToRegister = document.getElementById('toggleToRegister');
+    const toggleToLogin = document.getElementById('toggleToLogin');
+
+    // Attach event listeners
+    loginBtn.addEventListener('click', handleLogin);
+    registerBtn.addEventListener('click', handleRegister);
+    toggleToRegister.addEventListener('click', toggleForm);
+    toggleToLogin.addEventListener('click', toggleForm);
+
+    async function handleLogin() {
+      const email = document.getElementById('loginEmail').value;
+      const password = document.getElementById('loginPassword').value;
+      const messageEl = document.getElementById('loginMessage');
+
+      if (!email || !password) {
+        showMessage(messageEl, 'Please fill in all fields', 'error');
+        return;
+      }
+
+      try {
+        messageEl.textContent = 'Logging in...';
+        messageEl.className = 'message info';
+        messageEl.style.display = 'block';
+
+        await login(email, password);
+
+        messageEl.textContent = '✅ Login successful! Redirecting...';
+        messageEl.className = 'message success';
+
+        setTimeout(() => {
+          window.location.href = '/dashboard';
+        }, 1000);
+      } catch (error) {
+        showMessage(messageEl, error.message, 'error');
+      }
+    }
+
+    async function handleRegister() {
+      const name = document.getElementById('registerName').value;
+      const email = document.getElementById('registerEmail').value;
+      const password = document.getElementById('registerPassword').value;
+      const confirm = document.getElementById('registerConfirm').value;
+      const messageEl = document.getElementById('registerMessage');
+
+      if (!name || !email || !password || !confirm) {
+        showMessage(messageEl, 'Please fill in all fields', 'error');
+        return;
+      }
+
+      if (password !== confirm) {
+        showMessage(messageEl, 'Passwords do not match', 'error');
+        return;
+      }
+
+      if (password.length < 6) {
+        showMessage(messageEl, 'Password must be at least 6 characters', 'error');
+        return;
+      }
+
+      try {
+        messageEl.textContent = 'Registering...';
+        messageEl.className = 'message info';
+        messageEl.style.display = 'block';
+
+        await register(email, password, name);
+
+        messageEl.textContent = '✅ Registration successful! Redirecting...';
+        messageEl.className = 'message success';
+
+        setTimeout(() => {
+          window.location.href = '/dashboard';
+        }, 1000);
+      } catch (error) {
+        showMessage(messageEl, error.message, 'error');
+      }
+    }
+
+    function toggleForm() {
+      const loginForm = document.getElementById('loginForm');
+      const registerForm = document.getElementById('registerForm');
+
+      loginForm.style.display = loginForm.style.display === 'none' ? 'block' : 'none';
+      registerForm.style.display = registerForm.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function showMessage(element, message, type) {
+      element.textContent = message;
+      element.className = `message ${type}`;
+      element.style.display = 'block';
+    }
+  </script>
+</body>
+
+</html>

@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>إدارة الأشخاص - Ksar El Kebir</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Montserrat:wght@700&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    body {
+      direction: rtl;
+      text-align: right;
+    }
+  </style>
+</head>
+
+<body class="animate-fade">
+  <header class="navbar">
+    <div class="navbar-content">
+      <div class="nav-branding">
+        <h1>👥 Ksar El Kebir</h1>
+        <nav class="nav-links">
+          <a href="/dashboard">لوحة التحكم</a>
+          <a href="/people.html" class="active">الأشخاص</a>
+          <a href="/history.html">السجل</a>
+        </nav>
+      </div>
+      <div class="user-info">
+        <div class="user-details">
+          <div class="user-name" id="userName">جاري التحميل...</div>
+          <div class="user-role" id="userRole"></div>
+        </div>
+        <button class="btn-danger" id="logoutBtn">خروج</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="container">
+    <div class="dashboard-header">
+      <div>
+        <h2 style="font-size: 1.875rem; color: var(--text-main);">الأشخاص</h2>
+        <p style="color: var(--text-muted); font-weight: 500;">الإجمالي: <span id="peopleCount"
+            style="color: var(--primary);">0</span></p>
+      </div>
+      <button class="btn-primary" id="newPersonBtn">
+        <span>+ إضافة شخص</span>
+      </button>
+    </div>
+
+    <!-- People List -->
+    <div id="peopleContainer" class="cases-grid"></div>
+
+    <!-- Empty State -->
+    <div id="emptyState" class="empty-state" style="display: none;">
+      <p>📭 لا توجد أشخاص في قاعدة البيانات. أضف أول شخص!</p>
+    </div>
+    </div>
+
+    <!-- Add/Edit Person Modal -->
+    <div id="personModal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header"><span id="modalTitle">إضافة شخص جديد</span></div>
+        <div class="form-group">
+          <label for="personName">الاسم الكامل *</label>
+          <input type="text" id="personName" placeholder="الاسم الكامل" required>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+          <div class="form-group">
+            <label for="personPhone">رقم الهاتف</label>
+            <input type="tel" id="personPhone" placeholder="+966500000000">
+          </div>
+          <div class="form-group">
+            <label for="personCity">المدينة *</label>
+            <input type="text" id="personCity" placeholder="اسم المدينة" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="personNumberOfPeople">عدد أفراد الأسرة *</label>
+          <input type="number" id="personNumberOfPeople" placeholder="العدد" min="1" value="1" required>
+        </div>
+        <div class="form-group">
+          <label for="personNotes">ملاحظات إضافية</label>
+          <textarea id="personNotes" placeholder="معلومات إضافية" rows="3"></textarea>
+        </div>
+        <p id="personMessage" class="message"></p>
+        <div class="modal-footer">
+          <button class="btn-secondary" id="cancelPersonBtn">إلغاء</button>
+          <button class="btn-primary" id="submitPersonBtn">حفظ الشخص</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Person Details Modal -->
+    <div id="personDetailsModal" class="modal">
+      <div class="modal-content" style="max-width: 600px;">
+        <div class="modal-header">تفاصيل الشخص</div>
+        <div id="personDetailsContent"></div>
+        <div class="modal-footer">
+          <button class="btn-danger" id="deletePersonBtn">حذف الشخص</button>
+          <button class="btn-secondary" id="closeDetailsBtn">إغلاق</button>
+        </div>
+      </div>
+    </div>
+
+    <script type="module">
+      import {
+        isAuthenticated,
+        redirectIfNotAuthenticated,
+        getCurrentUser,
+        logout
+      } from '/js/auth.js';
+      import { peopleAPI } from '/js/api.js';
+
+      let currentPersonId = null;
+      let isEditMode = false;
+
+      // Get DOM elements
+      const newPersonBtn = document.getElementById('newPersonBtn');
+      const logoutBtn = document.getElementById('logoutBtn');
+      const cancelPersonBtn = document.getElementById('cancelPersonBtn');
+      const submitPersonBtn = document.getElementById('submitPersonBtn');
+      const closeDetailsBtn = document.getElementById('closeDetailsBtn');
+      const deletePersonBtn = document.getElementById('deletePersonBtn');
+
+      // Attach event listeners
+      newPersonBtn.addEventListener('click', openPersonModal);
+      logoutBtn.addEventListener('click', handleLogout);
+      cancelPersonBtn.addEventListener('click', closePersonModal);
+      submitPersonBtn.addEventListener('click', submitPerson);
+      closeDetailsBtn.addEventListener('click', closeDetailsModal);
+      deletePersonBtn.addEventListener('click', confirmDeletePerson);
+
+      // Check authentication on page load
+      redirectIfNotAuthenticated();
+
+      // Load user info and people on page load
+      document.addEventListener('DOMContentLoaded', async () => {
+        await loadUserInfo();
+        await loadPeople();
+      });
+
+      async function loadUserInfo() {
+        const user = getCurrentUser();
+        if (user) {
+          document.getElementById('userName').textContent = user.name || user.email;
+          document.getElementById('userRole').textContent = user.role.toUpperCase();
+        }
+      }
+
+      async function loadPeople() {
+        try {
+          const response = await peopleAPI.getAll();
+
+          if (response.success && response.people) {
+            displayPeople(response.people);
+            document.getElementById('peopleCount').textContent = response.count;
+
+            if (response.count === 0) {
+              document.getElementById('emptyState').style.display = 'block';
+              document.getElementById('peopleContainer').innerHTML = '';
+            } else {
+              document.getElementById('emptyState').style.display = 'none';
+            }
+          }
+        } catch (error) {
+          console.error('Error loading people:', error);
+          document.getElementById('peopleContainer').innerHTML = '<div class="empty-state">Error loading people. Please try again.</div>';
+        }
+      }
+
+      function displayPeople(people) {
+        const container = document.getElementById('peopleContainer');
+        container.innerHTML = '';
+
+        people.forEach(person => {
+          const card = document.createElement('div');
+          card.className = 'case-card';
+          card.style.cursor = 'pointer';
+
+          const dateStr = new Date(person.created_at).toLocaleDateString('ar-SA');
+
+          card.innerHTML = `
+            <div style="display: flex; flex-direction: column; height: 100%;">
+              <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
+                <h3 style="margin-bottom: 0;">${escapeHtml(person.full_name)}</h3>
+                <div class="case-date" style="background: var(--background); padding: 2px 8px; border-radius: 4px;">${dateStr}</div>
+              </div>
+              
+              <div class="case-description">
+                <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                  <span style="font-size: 0.875rem; color: var(--text-muted); display: flex; align-items: center; gap: 8px;">
+                    📍 ${escapeHtml(person.city || 'غير محدد')}
+                  </span>
+                  <span style="font-size: 0.875rem; color: var(--text-muted); display: flex; align-items: center; gap: 8px;">
+                    📞 ${escapeHtml(person.phone || 'غير مقدم')}
+                  </span>
+                  <span style="font-size: 0.875rem; color: var(--text-muted); display: flex; align-items: center; gap: 8px;">
+                    👨‍👩‍👧‍👦 ${person.number_of_people} أفراد
+                  </span>
+                </div>
+                ${person.notes ? `<p style="margin-top: 1rem; font-size: 0.8125rem; color: var(--text-muted); font-style: italic; border-right: 2px solid var(--border); padding-right: 8px;">${escapeHtml(person.notes)}</p>` : ''}
+              </div>
+              
+              <div style="margin-top: auto; padding-top: 1rem; display: flex; justify-content: flex-end;">
+                <span class="badge" style="background: rgba(99, 102, 241, 0.1); color: var(--primary);">عرض التفاصيل</span>
+              </div>
+            </div>
+          `;
+
+          card.addEventListener('click', () => showPersonDetails(person));
+          container.appendChild(card);
+        });
+      }
+
+      function openPersonModal() {
+        isEditMode = false;
+        currentPersonId = null;
+        document.getElementById('modalTitle').textContent = 'إضافة شخص جديد';
+        clearPersonForm();
+        document.getElementById('personModal').classList.add('active');
+        document.getElementById('personMessage').style.display = 'none';
+      }
+
+      function closePersonModal() {
+        document.getElementById('personModal').classList.remove('active');
+        clearPersonForm();
+        isEditMode = false;
+        currentPersonId = null;
+      }
+
+      function clearPersonForm() {
+        document.getElementById('personName').value = '';
+        document.getElementById('personPhone').value = '';
+        document.getElementById('personCity').value = '';
+        document.getElementById('personNumberOfPeople').value = '1';
+        document.getElementById('personNotes').value = '';
+      }
+
+      async function submitPerson() {
+        const name = document.getElementById('personName').value.trim();
+        const phone = document.getElementById('personPhone').value.trim();
+        const city = document.getElementById('personCity').value.trim();
+        const numberOfPeople = parseInt(document.getElementById('personNumberOfPeople').value) || 1;
+        const messageEl = document.getElementById('personMessage');
+
+        if (!name) {
+          showMessage(messageEl, 'الاسم الكامل مطلوب', 'error');
+          return;
+        }
+
+        if (!city) {
+          showMessage(messageEl, 'المدينة مطلوبة', 'error');
+          return;
+        }
+
+        try {
+          messageEl.textContent = 'جاري الحفظ...';
+          messageEl.className = 'message info';
+          messageEl.style.display = 'block';
+
+          if (isEditMode) {
+            await peopleAPI.update(currentPersonId, {
+              full_name: name,
+              phone: phone || null,
+              city,
+              number_of_people: numberOfPeople
+            });
+            messageEl.textContent = 'تم تحديث الشخص بنجاح!';
+          } else {
+            await peopleAPI.create(name, phone || null, city, numberOfPeople);
+            messageEl.textContent = 'تمت إضافة الشخص بنجاح!';
+          }
+
+          messageEl.className = 'message success';
+
+          setTimeout(() => {
+            closePersonModal();
+            loadPeople();
+          }, 1000);
+        } catch (error) {
+          showMessage(messageEl, error.message, 'error');
+        }
+      }
+
+      async function showPersonDetails(person) {
+        currentPersonId = person.id;
+        const content = document.getElementById('personDetailsContent');
+
+        const dateStr = new Date(person.created_at).toLocaleDateString('ar-SA');
+
+        content.innerHTML = `
+        <div style="padding: 20px 0;">
+          <h3>${escapeHtml(person.full_name)}</h3>
+          <div style="margin: 15px 0;">
+            <p><strong>الهاتف:</strong> ${escapeHtml(person.phone || 'غير مقدم')}</p>
+            <p><strong>المدينة:</strong> ${escapeHtml(person.city)}</p>
+            <p><strong>حجم الأسرة:</strong> ${person.number_of_people} أشخاص</p>
+            <p><strong>تمت الإضافة:</strong> ${dateStr}</p>
+            ${person.notes ? `<p><strong>ملاحظات:</strong> ${escapeHtml(person.notes)}</p>` : ''}
+          </div>
+          <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #eee;">
+            <button class="btn-secondary" onclick="document.getElementById('personModal').classList.add('active'); document.getElementById('modalTitle').textContent = 'تعديل الشخص'; populatePersonForm(${JSON.stringify(person)});">تعديل</button>
+          </div>
+        </div>
+      `;
+
+        document.getElementById('personDetailsModal').classList.add('active');
+      }
+
+      function closeDetailsModal() {
+        document.getElementById('personDetailsModal').classList.remove('active');
+        currentPersonId = null;
+      }
+
+      function populatePersonForm(person) {
+        isEditMode = true;
+        currentPersonId = person.id;
+        document.getElementById('personName').value = person.full_name;
+        document.getElementById('personPhone').value = person.phone || '';
+        document.getElementById('personCity').value = person.city;
+        document.getElementById('personNumberOfPeople').value = person.number_of_people;
+        document.getElementById('personNotes').value = person.notes || '';
+        document.getElementById('modalTitle').textContent = 'تعديل الشخص';
+        document.getElementById('personModal').classList.add('active');
+        document.getElementById('personDetailsModal').classList.remove('active');
+        document.getElementById('personMessage').style.display = 'none';
+      }
+
+      async function confirmDeletePerson() {
+        if (!currentPersonId) return;
+
+        if (confirm('هل أنت متأكد أنك تريد حذف هذا الشخص؟ لا يمكن التراجع عن هذا الإجراء.')) {
+          try {
+            await peopleAPI.delete(currentPersonId);
+            closeDetailsModal();
+            loadPeople();
+          } catch (error) {
+            alert('خطأ في حذف الشخص: ' + error.message);
+          }
+        }
+      }
+
+      function handleLogout() {
+        if (confirm('هل أنت متأكد من أنك تريد تسجيل الخروج؟')) {
+          logout();
+        }
+      }
+
+      function showMessage(element, message, type) {
+        element.textContent = message;
+        element.className = `message ${type}`;
+        element.style.display = 'block';
+      }
+
+      function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+      }
+
+      // Make functions available globally for inline onclick
+      window.populatePersonForm = populatePersonForm;
+    </script>
+</body>
+
+</html>

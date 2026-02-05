@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ksar El Kebir - Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Montserrat:wght@700&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+
+<body class="animate-fade">
+  <header class="navbar">
+    <div class="navbar-content">
+      <div class="nav-branding">
+        <h1>📋 Ksar El Kebir</h1>
+        <nav class="nav-links">
+          <a href="/dashboard" class="active">لوحة التحكم</a>
+          <a href="/people.html">الأشخاص</a>
+          <a href="/history.html">السجل</a>
+        </nav>
+      </div>
+      <div class="user-info">
+        <div class="user-details">
+          <div class="user-name" id="userName">Loading...</div>
+          <div class="user-role" id="userRole"></div>
+        </div>
+        <button class="btn-danger" id="logoutBtn">خروج</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="container">
+    <div class="dashboard-header">
+      <div>
+        <h2 style="font-size: 1.875rem; color: var(--text-main);">الحالات النشطة</h2>
+        <p style="color: var(--text-muted); font-weight: 500;">الإجمالي: <span id="casesCount"
+            style="color: var(--primary);">0</span></p>
+      </div>
+      <button class="btn-primary" id="newCaseBtn">
+        <span>+ إضافة حالة</span>
+      </button>
+    </div>
+
+    <!-- Cases Grid -->
+    <div id="casesContainer" class="cases-grid"></div>
+
+    <!-- Empty State -->
+    <div id="emptyState" class="empty-state" style="display: none; text-align: center; padding: 4rem 2rem;">
+      <div style="font-size: 4rem; margin-bottom: 1rem;">📭</div>
+      <p style="font-size: 1.125rem; color: var(--text-muted);">لا توجد حالات حالياً. أنشئ حالتك الأولى!</p>
+    </div>
+  </main>
+
+  <!-- New Case Modal -->
+  <div id="newCaseModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">إنشاء حالة جديدة</div>
+      <div class="form-group">
+        <label for="casePerson">الشخص الذي يطلب المساعدة *</label>
+        <select id="casePerson" required>
+          <option value="">-- اختر شخصاً --</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="caseDescription">الوصف</label>
+        <textarea id="caseDescription" placeholder="وصف الحالة" rows="3"></textarea>
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+        <div class="form-group">
+          <label for="caseUrgency">درجة الأولوية *</label>
+          <select id="caseUrgency" required>
+            <option value="normal" selected>عادي</option>
+            <option value="urgent">عاجل</option>
+            <option value="very_urgent">عاجل جداً</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="caseContactMethod">طريقة الاتصال *</label>
+          <select id="caseContactMethod" required>
+            <option value="call" selected>اتصال</option>
+            <option value="whatsapp">واتس آب</option>
+            <option value="sms">رسالة نصية</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>أنواع المساعدة المطلوبة</label>
+        <div id="caseAidTypes"
+          style="border: 1px solid var(--border); border-radius: var(--radius-md); padding: 1rem; max-height: 15rem; overflow-y: auto; background: var(--background);">
+        </div>
+      </div>
+      <p id="newCaseMessage" class="message"></p>
+      <div class="modal-footer">
+        <button class="btn-secondary" id="cancelNewCaseBtn">إلغاء</button>
+        <button class="btn-primary" id="submitNewCaseBtn">إنشاء حالة</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import {
+      isAuthenticated,
+      redirectIfNotAuthenticated,
+      getCurrentUser,
+      logout,
+      getCurrentUserProfile
+    } from '/js/auth.js';
+    import { casesAPI, peopleAPI, aidTypesAPI } from '/js/api.js';
+
+    // Get DOM elements
+    const newCaseBtn = document.getElementById('newCaseBtn');
+    const logoutBtn = document.getElementById('logoutBtn');
+    const cancelNewCaseBtn = document.getElementById('cancelNewCaseBtn');
+    const submitNewCaseBtn = document.getElementById('submitNewCaseBtn');
+
+    // Attach event listeners
+    newCaseBtn.addEventListener('click', openNewCaseModal);
+    logoutBtn.addEventListener('click', handleLogout);
+    cancelNewCaseBtn.addEventListener('click', closeNewCaseModal);
+    submitNewCaseBtn.addEventListener('click', submitNewCase);
+
+    // Check authentication on page load
+    redirectIfNotAuthenticated();
+
+    // Load user info and cases on page load
+    document.addEventListener('DOMContentLoaded', async () => {
+      try {
+        await loadUserInfo();
+        await loadCases();
+      } catch (error) {
+        console.error('Error on page load:', error);
+      }
+    });
+
+    async function loadUserInfo() {
+      const user = getCurrentUser();
+      if (user) {
+        document.getElementById('userName').textContent = user.name || user.email;
+        document.getElementById('userRole').textContent = user.role.toUpperCase();
+      }
+    }
+
+    async function loadCases() {
+      try {
+        const response = await casesAPI.getAll();
+
+        if (response.success && response.cases) {
+          displayCases(response.cases);
+          document.getElementById('casesCount').textContent = response.count;
+
+          if (response.count === 0) {
+            document.getElementById('emptyState').style.display = 'block';
+            document.getElementById('casesContainer').innerHTML = '';
+          } else {
+            document.getElementById('emptyState').style.display = 'none';
+          }
+        }
+      } catch (error) {
+        console.error('Error loading cases:', error);
+        // Check if it's an auth error
+        if (error.message && error.message.includes('401')) {
+          alert('❌ انتهت جلستك. يرجى تسجيل الدخول من جديد');
+          redirectIfNotAuthenticated();
+        } else {
+          document.getElementById('casesContainer').innerHTML = '<div class="empty-state">❌ خطأ في تحميل الحالات. يرجى المحاولة لاحقاً.</div>';
+        }
+      }
+    }
+
+    function displayCases(cases) {
+      const container = document.getElementById('casesContainer');
+      container.innerHTML = '';
+
+      // Filter to show only active cases (not completed or archived)
+      const activeCases = cases.filter(c => c.status !== 'completed' && c.status !== 'archived');
+
+      activeCases.forEach(caseItem => {
+        const card = document.createElement('div');
+        card.className = 'case-card';
+
+        const statusClass = `badge-status-${caseItem.status}`;
+        const dateStr = new Date(caseItem.created_at).toLocaleDateString('ar-SA');
+
+        const urgencyClass = `badge-urgency-${caseItem.urgency}`;
+
+        card.innerHTML = `
+          <div style="display: flex; flex-direction: column; height: 100%;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
+              <h3 style="margin-bottom: 0;">${escapeHtml(caseItem.person_name)}</h3>
+              <div class="case-date" style="background: var(--background); padding: 2px 8px; border-radius: 4px;">${dateStr}</div>
+            </div>
+            
+            <p class="case-description">${escapeHtml(caseItem.description || 'بدون وصف')}</p>
+            
+            <div class="case-meta" style="margin-top: auto;">
+              <span class="badge ${statusClass}">${getStatusLabel(caseItem.status)}</span>
+              <span class="badge ${urgencyClass}">${getUrgencyLabel(caseItem.urgency)}</span>
+              ${caseItem.aid_types ? `<span class="badge" style="background: rgba(99, 102, 241, 0.1); color: var(--primary);">${caseItem.aid_types}</span>` : ''}
+            </div>
+            
+            <div style="margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+              <div style="font-size: 0.75rem; color: var(--text-muted); display: flex; flex-direction: column; gap: 2px;">
+                <span>📞 ${escapeHtml(caseItem.phone || 'N/A')}</span>
+                <span>📍 ${escapeHtml(caseItem.city || 'N/A')}</span>
+              </div>
+              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; background: var(--background); padding: 6px 12px; border-radius: var(--radius-md); transition: background 0.2s;">
+                <input type="checkbox" class="case-complete-checkbox" data-case-id="${caseItem.id}" style="width: 16px; height: 16px; cursor: pointer;">
+                <span style="font-size: 0.75rem; font-weight: 600; color: var(--text-main);">مكتمل</span>
+              </label>
+            </div>
+          </div>
+        `;
+
+        container.appendChild(card);
+      });
+
+      // Add event listeners to checkboxes
+      document.querySelectorAll('.case-complete-checkbox').forEach(checkbox => {
+        checkbox.addEventListener('change', async (e) => {
+          if (e.target.checked) {
+            const caseId = parseInt(e.target.dataset.caseId);
+            console.log('Checkbox changed for case:', caseId);
+            await completeCase(caseId);
+          }
+        });
+      });
+    }
+
+    async function completeCase(caseId) {
+      try {
+        console.log('Marking case as completed:', caseId);
+        const token = localStorage.getItem('authToken');
+
+        if (!token) {
+          console.error('No token found in localStorage');
+          alert('❌ الجلسة منتهية. يرجى تسجيل الدخول من جديد');
+          redirectIfNotAuthenticated();
+          return;
+        }
+
+        console.log('Token found, sending PUT request to /api/cases/' + caseId);
+
+        const response = await fetch(`/api/cases/${caseId}`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ status: 'completed' })
+        });
+
+        console.log('PUT Response status:', response.status, response.statusText);
+
+        // Try to parse response
+        let responseData;
+        try {
+          responseData = await response.json();
+          console.log('Response JSON:', responseData);
+        } catch (e) {
+          console.error('Failed to parse response JSON:', e);
+          responseData = {};
+        }
+
+        if (!response.ok) {
+          if (response.status === 401) {
+            console.log('Token expired (401), clearing token');
+            localStorage.removeItem('authToken');
+            alert('❌ انتهت جلستك. يرجى تسجيل الدخول من جديد');
+            window.location.href = '/';
+            return;
+          }
+
+          const errorMsg = responseData.message || responseData.error || `HTTP ${response.status}`;
+          throw new Error(errorMsg);
+        }
+
+        console.log('Case completed successfully!');
+        alert('✅ تمت تحديث الحالة إلى مكتمل وتم نقلها إلى السجل!');
+
+        // Reload cases
+        setTimeout(() => {
+          console.log('Reloading cases...');
+          loadCases();
+        }, 500);
+
+      } catch (error) {
+        console.error('Error in completeCase:', error);
+        alert(`❌ خطأ: ${error.message}`);
+      }
+    }
+
+    function getUrgencyLabel(urgency) {
+      const labels = {
+        'normal': 'عادي',
+        'urgent': 'عاجل',
+        'very_urgent': 'عاجل جداً'
+      };
+      return labels[urgency] || urgency;
+    }
+
+    function getStatusLabel(status) {
+      const labels = {
+        'new': 'جديد',
+        'in_progress': 'قيد المعالجة',
+        'blocked': 'معطل',
+        'completed': 'مكتمل',
+        'archived': 'مؤرشف'
+      };
+      return labels[status] || status;
+    }
+
+    function openNewCaseModal() {
+      populatePeopleDropdown();
+      populateAidTypesCheckboxes();
+      document.getElementById('newCaseModal').classList.add('active');
+      document.getElementById('newCaseMessage').style.display = 'none';
+    }
+
+    function closeNewCaseModal() {
+      document.getElementById('newCaseModal').classList.remove('active');
+      document.getElementById('casePerson').value = '';
+      document.getElementById('caseDescription').value = '';
+      document.getElementById('caseUrgency').value = 'normal';
+      document.getElementById('caseContactMethod').value = 'call';
+      document.querySelectorAll('.aid-type-checkbox').forEach(cb => cb.checked = false);
+    }
+
+    async function submitNewCase() {
+      const person_id = document.getElementById('casePerson').value;
+      const description = document.getElementById('caseDescription').value;
+      const urgency = document.getElementById('caseUrgency').value;
+      const contact_method = document.getElementById('caseContactMethod').value;
+      const messageEl = document.getElementById('newCaseMessage');
+
+      if (!person_id) {
+        showMessage(messageEl, 'Please select a person', 'error');
+        return;
+      }
+
+      // Get selected aid types
+      const aid_type_ids = Array.from(document.querySelectorAll('.aid-type-checkbox:checked'))
+        .map(cb => parseInt(cb.value));
+
+      try {
+        messageEl.textContent = 'Creating case...';
+        messageEl.className = 'message info';
+        messageEl.style.display = 'block';
+
+        await casesAPI.create(parseInt(person_id), description, urgency, contact_method, aid_type_ids);
+
+        messageEl.textContent = 'Case created successfully!';
+        messageEl.className = 'message success';
+
+        setTimeout(() => {
+          closeNewCaseModal();
+          loadCases();
+        }, 1000);
+      } catch (error) {
+        showMessage(messageEl, error.message, 'error');
+      }
+    }
+
+    async function populatePeopleDropdown() {
+      try {
+        const response = await peopleAPI.getAll();
+        const select = document.getElementById('casePerson');
+
+        if (response.people && response.people.length > 0) {
+          response.people.forEach(person => {
+            const option = document.createElement('option');
+            option.value = person.id;
+            option.textContent = `${person.full_name} (${person.city || 'Unknown city'}) - ${person.number_of_people} people`;
+            select.appendChild(option);
+          });
+        }
+      } catch (error) {
+        console.error('Error loading people:', error);
+      }
+    }
+
+    async function populateAidTypesCheckboxes() {
+      try {
+        const response = await aidTypesAPI.getAll();
+        const container = document.getElementById('caseAidTypes');
+        container.innerHTML = '';
+
+        if (response.aid_types && response.aid_types.length > 0) {
+          response.aid_types.forEach(aidType => {
+            const label = document.createElement('label');
+            label.style.display = 'flex';
+            label.style.alignItems = 'center';
+            label.style.gap = '10px';
+            label.style.marginBottom = '12px';
+            label.style.cursor = 'pointer';
+            label.style.padding = '8px';
+            label.style.borderRadius = '4px';
+            label.style.transition = 'background-color 0.2s';
+
+            label.addEventListener('mouseenter', () => {
+              label.style.backgroundColor = 'rgba(102, 126, 234, 0.1)';
+            });
+            label.addEventListener('mouseleave', () => {
+              label.style.backgroundColor = 'transparent';
+            });
+
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.className = 'aid-type-checkbox';
+            checkbox.value = aidType.id;
+            checkbox.style.width = '18px';
+            checkbox.style.height = '18px';
+            checkbox.style.cursor = 'pointer';
+            checkbox.style.flexShrink = '0';
+
+            const text = document.createElement('span');
+            text.textContent = aidType.label;
+            text.style.fontSize = '14px';
+            text.style.color = '#333';
+
+            label.appendChild(checkbox);
+            label.appendChild(text);
+            container.appendChild(label);
+          });
+        }
+      } catch (error) {
+        console.error('Error loading aid types:', error);
+      }
+    }
+
+    function handleLogout() {
+      if (confirm('Are you sure you want to logout?')) {
+        logout();
+      }
+    }
+
+    function showMessage(element, message, type) {
+      element.textContent = message;
+      element.className = `message ${type}`;
+      element.style.display = 'block';
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+  </script>
+</body>
+
+</html>

@@ -1,11 +1,11 @@
 import pkg from 'pg';
-const { Pool } = pkg; // Using Pool instead of Client for better production performance
+const { Pool } = pkg;
 import 'dotenv/config';
 
-const connectionString = process.env.DATABASE_URL;
-
+// Initialize pool without connection string immediately
+// We'll pass it when needed or let pg handle it from environment
 const poolConfig = {
-  connectionString: connectionString,
+  connectionString: process.env.DATABASE_URL,
   ssl: {
     rejectUnauthorized: false
   }
@@ -14,7 +14,8 @@ const poolConfig = {
 export const client = new Pool(poolConfig);
 
 export async function connectDB() {
-  if (!connectionString) {
+  const dbUrl = process.env.DATABASE_URL;
+  if (!dbUrl) {
     throw new Error('DATABASE_URL is not defined in environment variables. Please check your Railway/Production settings.');
   }
 

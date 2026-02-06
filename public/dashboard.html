@@ -244,41 +244,8 @@
           return;
         }
 
-        console.log('Token found, sending PUT request to /api/cases/' + caseId);
-
-        const response = await fetch(`/api/cases/${caseId}`, {
-          method: 'PUT',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ status: 'completed' })
-        });
-
-        console.log('PUT Response status:', response.status, response.statusText);
-
-        // Try to parse response
-        let responseData;
-        try {
-          responseData = await response.json();
-          console.log('Response JSON:', responseData);
-        } catch (e) {
-          console.error('Failed to parse response JSON:', e);
-          responseData = {};
-        }
-
-        if (!response.ok) {
-          if (response.status === 401) {
-            console.log('Token expired (401), clearing token');
-            localStorage.removeItem('authToken');
-            alert('❌ انتهت جلستك. يرجى تسجيل الدخول من جديد');
-            window.location.href = '/';
-            return;
-          }
-
-          const errorMsg = responseData.message || responseData.error || `HTTP ${response.status}`;
-          throw new Error(errorMsg);
-        }
+        console.log('Token found, sending update request...');
+        await casesAPI.update(caseId, { status: 'completed' });
 
         console.log('Case completed successfully!');
         alert('✅ تمت تحديث الحالة إلى مكتمل وتم نقلها إلى السجل!');

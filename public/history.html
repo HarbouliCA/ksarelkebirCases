@@ -182,16 +182,7 @@
 
       async function loadHistory() {
         try {
-          const response = await fetch('/api/cases', {
-            method: 'GET',
-            headers: {
-              'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-            }
-          });
-
-          if (!response.ok) throw new Error('فشل تحميل السجل');
-
-          const data = await response.json();
+          const data = await casesAPI.getAll();
           let cases = data.cases || data || [];
 
           // Ensure cases is an array
@@ -265,16 +256,7 @@
 
       window.restoreCase = async function (caseId) {
         try {
-          const response = await fetch(`/api/cases/${caseId}`, {
-            method: 'PUT',
-            headers: {
-              'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ status: 'new' })
-          });
-
-          if (!response.ok) throw new Error('فشل استعادة الحالة');
+          await casesAPI.update(caseId, { status: 'new' });
 
           alert('تمت استعادة الحالة بنجاح!');
           await loadHistory();

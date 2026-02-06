@@ -24,6 +24,7 @@ const corsOptions = {
     'http://localhost:3001',
     'http://localhost:5173', // Vite default
     'https://ksarelkebirCases.vercel.app',
+    'https://ksarelkebir-cases.vercel.app',
     'https://ksarapp.sagafit.es',
   ],
   credentials: true,

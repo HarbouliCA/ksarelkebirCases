@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>إدارة المتطوعين - Ksar El Kebir</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Montserrat:wght@700&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    body {
+      direction: rtl;
+      text-align: right;
+    }
+  </style>
+</head>
+
+<body class="animate-fade">
+  <header class="navbar">
+    <div class="navbar-content">
+      <div class="nav-branding">
+        <h1>👥 Ksar El Kebir</h1>
+        <nav class="nav-links">
+          <a href="/dashboard">لوحة التحكم</a>
+          <a href="/people.html">الأشخاص</a>
+          <a href="/volunteers.html" class="active">المتطوعين</a>
+          <a href="/history.html">السجل</a>
+        </nav>
+      </div>
+      <div class="user-info">
+        <div class="user-details">
+          <div class="user-name" id="userName">جاري التحميل...</div>
+          <div class="user-role" id="userRole"></div>
+        </div>
+        <button class="btn-danger" id="logoutBtn">خروج</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="container">
+    <div class="dashboard-header">
+      <div>
+        <h2 style="font-size: 1.875rem; color: var(--text-main);">المتطوعين</h2>
+        <p style="color: var(--text-muted); font-weight: 500;">الإجمالي: <span id="volunteersCount"
+            style="color: var(--primary);">0</span></p>
+      </div>
+      <button class="btn-primary" id="newVolunteerBtn">
+        <span>+ إضافة متطوع</span>
+      </button>
+    </div>
+
+    <!-- Volunteers List -->
+    <div id="volunteersContainer" class="cases-grid"></div>
+
+    <!-- Empty State -->
+    <div id="emptyState" class="empty-state" style="display: none;">
+      <p>📭 لا يوجد متطوعين حالياً. أضف أول متطوع!</p>
+    </div>
+    </div>
+
+    <!-- Add Volunteer Modal -->
+    <div id="volunteerModal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header"><span id="modalTitle">إضافة متطوع جديد</span></div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+          <div class="form-group">
+            <label for="firstName">الاسم الأول *</label>
+            <input type="text" id="firstName" placeholder="الاسم الأول" required>
+          </div>
+          <div class="form-group">
+            <label for="lastName">النسب *</label>
+            <input type="text" id="lastName" placeholder="النسب" required>
+          </div>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+          <div class="form-group">
+            <label for="volunteerPhone">رقم الهاتف</label>
+            <input type="tel" id="volunteerPhone" placeholder="+966500000000">
+          </div>
+          <div class="form-group">
+            <label for="volunteerJob">الوظيفة</label>
+            <input type="text" id="volunteerJob" placeholder="الوظيفة">
+          </div>
+        </div>
+        <p id="volunteerMessage" class="message"></p>
+        <div class="modal-footer">
+          <button class="btn-secondary" id="cancelVolunteerBtn">إلغاء</button>
+          <button class="btn-primary" id="submitVolunteerBtn">حفظ المتطوع</button>
+        </div>
+      </div>
+    </div>
+
+    <script type="module">
+      import {
+        isAuthenticated,
+        redirectIfNotAuthenticated,
+        getCurrentUser,
+        logout
+      } from '/js/auth.js';
+      import { volunteersAPI } from '/js/api.js';
+
+      // Get DOM elements
+      const newVolunteerBtn = document.getElementById('newVolunteerBtn');
+      const logoutBtn = document.getElementById('logoutBtn');
+      const cancelVolunteerBtn = document.getElementById('cancelVolunteerBtn');
+      const submitVolunteerBtn = document.getElementById('submitVolunteerBtn');
+
+      // Attach event listeners
+      newVolunteerBtn.addEventListener('click', openVolunteerModal);
+      logoutBtn.addEventListener('click', handleLogout);
+      cancelVolunteerBtn.addEventListener('click', closeVolunteerModal);
+      submitVolunteerBtn.addEventListener('click', submitVolunteer);
+
+      // Check authentication on page load
+      redirectIfNotAuthenticated();
+
+      // Load user info and volunteers on page load
+      document.addEventListener('DOMContentLoaded', async () => {
+        await loadUserInfo();
+        await loadVolunteers();
+      });
+
+      async function loadUserInfo() {
+        const user = getCurrentUser();
+        if (user) {
+          document.getElementById('userName').textContent = user.name || user.email;
+          document.getElementById('userRole').textContent = user.role.toUpperCase();
+        }
+      }
+
+      async function loadVolunteers() {
+        try {
+          const response = await volunteersAPI.getAll();
+
+          if (response.success && response.volunteers) {
+            displayVolunteers(response.volunteers);
+            document.getElementById('volunteersCount').textContent = response.count;
+
+            if (response.count === 0) {
+              document.getElementById('emptyState').style.display = 'block';
+              document.getElementById('volunteersContainer').innerHTML = '';
+            } else {
+              document.getElementById('emptyState').style.display = 'none';
+            }
+          }
+        } catch (error) {
+          console.error('Error loading volunteers:', error);
+          document.getElementById('volunteersContainer').innerHTML = '<div class="empty-state">Error loading volunteers. Please try again.</div>';
+        }
+      }
+
+      function displayVolunteers(volunteers) {
+        const container = document.getElementById('volunteersContainer');
+        container.innerHTML = '';
+
+        volunteers.forEach(volunteer => {
+          const card = document.createElement('div');
+          card.className = 'case-card';
+
+          const dateStr = new Date(volunteer.created_at).toLocaleDateString('en-GB');
+
+          card.innerHTML = `
+            <div style="display: flex; flex-direction: column; height: 100%;">
+              <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
+                <h3 style="margin-bottom: 0;">${escapeHtml(volunteer.first_name + ' ' + volunteer.last_name)}</h3>
+                <div class="case-date" style="background: var(--background); padding: 2px 8px; border-radius: 4px;">${dateStr}</div>
+              </div>
+              
+              <div class="case-description">
+                <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                  <span style="font-size: 0.875rem; color: var(--text-muted); display: flex; align-items: center; gap: 8px;">
+                    📞 ${escapeHtml(volunteer.phone || 'غير مقدم')}
+                  </span>
+                  <span style="font-size: 0.875rem; color: var(--text-muted); display: flex; align-items: center; gap: 8px;">
+                    💼 ${escapeHtml(volunteer.job || 'غير محدد')}
+                  </span>
+                </div>
+              </div>
+              
+              <div style="margin-top: auto; padding-top: 1rem; display: flex; justify-content: flex-end;">
+                <button class="btn-danger" style="padding: 4px 8px; font-size: 12px;">حذف</button>
+              </div>
+            </div>
+          `;
+          
+          // Add delete listener
+          const deleteBtn = card.querySelector('.btn-danger');
+          deleteBtn.addEventListener('click', () => confirmDeleteVolunteer(volunteer.id));
+
+          container.appendChild(card);
+        });
+      }
+
+      function openVolunteerModal() {
+        document.getElementById('firstName').value = '';
+        document.getElementById('lastName').value = '';
+        document.getElementById('volunteerPhone').value = '';
+        document.getElementById('volunteerJob').value = '';
+        document.getElementById('volunteerModal').classList.add('active');
+        document.getElementById('volunteerMessage').style.display = 'none';
+      }
+
+      function closeVolunteerModal() {
+        document.getElementById('volunteerModal').classList.remove('active');
+      }
+
+      async function submitVolunteer() {
+        const firstName = document.getElementById('firstName').value.trim();
+        const lastName = document.getElementById('lastName').value.trim();
+        const phone = document.getElementById('volunteerPhone').value.trim();
+        const job = document.getElementById('volunteerJob').value.trim();
+        const messageEl = document.getElementById('volunteerMessage');
+
+        if (!firstName || !lastName) {
+          showMessage(messageEl, 'الاسم الأول والنسب مطلوبان', 'error');
+          return;
+        }
+
+        try {
+          messageEl.textContent = 'جاري الحفظ...';
+          messageEl.className = 'message info';
+          messageEl.style.display = 'block';
+
+          await volunteersAPI.create(firstName, lastName, phone || null, job || null);
+          messageEl.textContent = 'تمت إضافة المتطوع بنجاح!';
+          messageEl.className = 'message success';
+
+          setTimeout(() => {
+            closeVolunteerModal();
+            loadVolunteers();
+          }, 1000);
+        } catch (error) {
+          showMessage(messageEl, error.message, 'error');
+        }
+      }
+
+      async function confirmDeleteVolunteer(id) {
+        if (confirm('هل أنت متأكد أنك تريد حذف هذا المتطوع؟')) {
+          try {
+            await volunteersAPI.delete(id);
+            loadVolunteers();
+          } catch (error) {
+            alert('خطأ في حذف المتطوع: ' + error.message);
+          }
+        }
+      }
+
+      function handleLogout() {
+        if (confirm('هل أنت متأكد من أنك تريد تسجيل الخروج؟')) {
+          logout();
+        }
+      }
+
+      function showMessage(element, message, type) {
+        element.textContent = message;
+        element.className = `message ${type}`;
+        element.style.display = 'block';
+      }
+
+      function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+      }
+    </script>
+</body>
+
+</html>

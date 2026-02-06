@@ -13,6 +13,7 @@ import aidTypesRoutes from './src/routes/aid-types.js';
 import notesRoutes from './src/routes/notes.js';
 import caseHistoryRoutes from './src/routes/case-history.js';
 import caseAidTypesRoutes from './src/routes/case-aid-types.js';
+import volunteersRoutes from './src/routes/volunteers.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -63,6 +64,7 @@ app.use('/api/aid-types', aidTypesRoutes);
 app.use('/api/notes', notesRoutes);
 app.use('/api/case-history', caseHistoryRoutes);
 app.use('/api/case-aid-types', caseAidTypesRoutes);
+app.use('/api/volunteers', volunteersRoutes);
 
 // Static pages
 app.get('/', (req, res) => res.sendFile('public/index.html', { root: '.' }));

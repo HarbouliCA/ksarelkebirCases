@@ -4,20 +4,22 @@ import { authMiddleware } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// GET /api/cases - Get all cases with people and aid types (protected)
+// GET /api/cases - Get all cases with people, aid types, and volunteers (protected)
 router.get('/', authMiddleware, async (req, res, next) => {
   try {
     const { status, urgency, city } = req.query;
 
     let sql = `
       SELECT c.id, c.person_id, c.status, c.urgency, c.contact_method, c.description, 
-             c.assigned_to, c.created_by, c.created_at, c.updated_at,
+             c.assigned_to, c.created_by, c.created_at, c.updated_at, c.volunteer_id,
              p.full_name as person_name, p.phone, p.city,
-             STRING_AGG(at.label, ', ') as aid_types
+             STRING_AGG(at.label, ', ') as aid_types,
+             v.first_name as volunteer_first_name, v.last_name as volunteer_last_name
       FROM cases c
       JOIN people p ON c.person_id = p.id
       LEFT JOIN case_aid_types cat ON c.id = cat.case_id
       LEFT JOIN aid_types at ON cat.aid_type_id = at.id
+      LEFT JOIN volunteers v ON c.volunteer_id = v.id
     `;
 
     const conditions = [];
@@ -40,7 +42,7 @@ router.get('/', authMiddleware, async (req, res, next) => {
       sql += ' WHERE ' + conditions.join(' AND ');
     }
 
-    sql += ' GROUP BY c.id, p.id ORDER BY c.created_at DESC';
+    sql += ' GROUP BY c.id, p.id, v.id ORDER BY c.created_at DESC';
 
     const result = await query(sql, params);
 
@@ -60,14 +62,16 @@ router.get('/:id', authMiddleware, async (req, res, next) => {
     const { id } = req.params;
 
     const result = await query(
-      `SELECT c.id, c.person_id, c.status, c.urgency, c.contact_method, c.notes,
-              c.assigned_to, c.created_by, c.created_at, c.updated_at,
+      `SELECT c.id, c.person_id, c.status, c.urgency, c.contact_method, c.description,
+              c.assigned_to, c.created_by, c.created_at, c.updated_at, c.volunteer_id,
               p.full_name as person_name, p.phone, p.city, p.number_of_people,
-              u.full_name as assigned_to_name, creator.full_name as created_by_name
+              u.full_name as assigned_to_name, creator.full_name as created_by_name,
+              v.first_name as volunteer_first_name, v.last_name as volunteer_last_name, v.phone as volunteer_phone, v.job as volunteer_job
        FROM cases c
        JOIN people p ON c.person_id = p.id
        LEFT JOIN users u ON c.assigned_to = u.id
        LEFT JOIN users creator ON c.created_by = creator.id
+       LEFT JOIN volunteers v ON c.volunteer_id = v.id
        WHERE c.id = $1`,
       [id]
     );
@@ -80,7 +84,7 @@ router.get('/:id', authMiddleware, async (req, res, next) => {
 
     // Get aid types for this case
     const aidTypesResult = await query(
-      `SELECT cat.id, at.id as aid_type_id, at.label, at.description
+      `SELECT at.id as aid_type_id, at.label, at.description
        FROM case_aid_types cat
        JOIN aid_types at ON cat.aid_type_id = at.id
        WHERE cat.case_id = $1
@@ -103,7 +107,7 @@ router.get('/:id', authMiddleware, async (req, res, next) => {
 // POST /api/cases - Create new case (protected)
 router.post('/', authMiddleware, async (req, res, next) => {
   try {
-    const { person_id, urgency, contact_method, description, aid_type_ids } = req.body;
+    const { person_id, urgency, contact_method, description, aid_type_ids, volunteer_id } = req.body;
     const userId = req.user.id;
 
     if (!person_id) {
@@ -121,10 +125,10 @@ router.post('/', authMiddleware, async (req, res, next) => {
     }
 
     const result = await query(
-      `INSERT INTO cases (person_id, status, urgency, contact_method, description, created_by) 
-       VALUES ($1, $2, $3, $4, $5, $6) 
+      `INSERT INTO cases (person_id, status, urgency, contact_method, description, created_by, volunteer_id) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7) 
        RETURNING *`,
-      [person_id, 'new', urgency || 'normal', contact_method || 'call', description || '', userId]
+      [person_id, 'new', urgency || 'normal', contact_method || 'call', description || '', userId, volunteer_id || null]
     );
 
     const caseId = result.rows[0].id;
@@ -165,7 +169,7 @@ router.post('/', authMiddleware, async (req, res, next) => {
 router.put('/:id', authMiddleware, async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { status, urgency, contact_method, description, assigned_to } = req.body;
+    const { status, urgency, contact_method, description, assigned_to, volunteer_id } = req.body;
     const userId = req.user.id;
 
     // Get current case to track status change for history
@@ -187,10 +191,11 @@ router.put('/:id', authMiddleware, async (req, res, next) => {
         contact_method = COALESCE($3, contact_method),
         description = COALESCE($4, description),
         assigned_to = COALESCE($5, assigned_to),
+        volunteer_id = COALESCE($6, volunteer_id),
         updated_at = NOW()
-       WHERE id = $6 
+       WHERE id = $7 
        RETURNING *`,
-      [status, urgency, contact_method, description, assigned_to, id]
+      [status, urgency, contact_method, description, assigned_to, volunteer_id, id]
     );
 
     // If status changed, trigger history logging (also handled by DB trigger)

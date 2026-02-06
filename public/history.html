@@ -78,6 +78,7 @@
         <nav class="nav-links">
           <a href="/dashboard">لوحة التحكم</a>
           <a href="/people.html">الأشخاص</a>
+          <a href="/volunteers.html">المتطوعين</a>
           <a href="/history.html" class="active">السجل</a>
         </nav>
       </div>
@@ -220,7 +221,7 @@
             <div style="display: flex; flex-direction: column; height: 100%;">
               <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
                 <h3 style="margin-bottom: 0;">📋 ${escapeHtml(c.person_name)}</h3>
-                <div class="case-date" style="background: var(--background); padding: 2px 8px; border-radius: 4px;">${new Date(c.created_at).toLocaleDateString('ar-SA')}</div>
+                <div class="case-date" style="background: var(--background); padding: 2px 8px; border-radius: 4px;">${new Date(c.created_at).toLocaleDateString('en-GB')}</div>
               </div>
               
               <p class="case-description">${escapeHtml(c.description || 'بدون وصف')}</p>

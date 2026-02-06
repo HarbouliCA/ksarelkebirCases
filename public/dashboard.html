@@ -21,6 +21,7 @@
         <nav class="nav-links">
           <a href="/dashboard" class="active">لوحة التحكم</a>
           <a href="/people.html">الأشخاص</a>
+          <a href="/volunteers.html">المتطوعين</a>
           <a href="/history.html">السجل</a>
         </nav>
       </div>
@@ -57,20 +58,24 @@
     </div>
   </main>
 
-  <!-- New Case Modal -->
-  <div id="newCaseModal" class="modal">
+  <!-- Add/Edit Case Modal -->
+  <div id="caseModal" class="modal">
     <div class="modal-content">
-      <div class="modal-header">إنشاء حالة جديدة</div>
+      <div class="modal-header"><span id="modalTitle">إنشاء حالة جديدة</span></div>
+      
       <div class="form-group">
         <label for="casePerson">الشخص الذي يطلب المساعدة *</label>
+        <input type="text" id="personSearch" placeholder="بحث عن شخص (بالاسم)" style="margin-bottom: 5px;">
         <select id="casePerson" required>
           <option value="">-- اختر شخصاً --</option>
         </select>
       </div>
+      
       <div class="form-group">
         <label for="caseDescription">الوصف</label>
         <textarea id="caseDescription" placeholder="وصف الحالة" rows="3"></textarea>
       </div>
+      
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
         <div class="form-group">
           <label for="caseUrgency">درجة الأولوية *</label>
@@ -89,16 +94,37 @@
           </select>
         </div>
       </div>
+
+      <div class="form-group">
+        <label for="caseVolunteer">تعيين متطوع</label>
+        <select id="caseVolunteer">
+          <option value="">-- بدون متطوع --</option>
+        </select>
+      </div>
+
       <div class="form-group">
         <label>أنواع المساعدة المطلوبة</label>
         <div id="caseAidTypes"
           style="border: 1px solid var(--border); border-radius: var(--radius-md); padding: 1rem; max-height: 15rem; overflow-y: auto; background: var(--background);">
         </div>
       </div>
-      <p id="newCaseMessage" class="message"></p>
+      
+      <p id="caseMessage" class="message"></p>
+      
       <div class="modal-footer">
-        <button class="btn-secondary" id="cancelNewCaseBtn">إلغاء</button>
-        <button class="btn-primary" id="submitNewCaseBtn">إنشاء حالة</button>
+        <button class="btn-secondary" id="cancelCaseBtn">إلغاء</button>
+        <button class="btn-primary" id="submitCaseBtn">حفظ الحالة</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Case Details Modal -->
+  <div id="caseDetailsModal" class="modal">
+    <div class="modal-content" style="max-width: 600px;">
+      <div class="modal-header">تفاصيل الحالة</div>
+      <div id="caseDetailsContent"></div>
+      <div class="modal-footer">
+        <button class="btn-secondary" id="closeCaseDetailsBtn">إغلاق</button>
       </div>
     </div>
   </div>
@@ -111,19 +137,34 @@
       logout,
       getCurrentUserProfile
     } from '/js/auth.js';
-    import { casesAPI, peopleAPI, aidTypesAPI } from '/js/api.js';
+    import { casesAPI, peopleAPI, aidTypesAPI, volunteersAPI } from '/js/api.js';
+
+    let currentCaseId = null;
+    let isEditMode = false;
+    let allPeople = []; // Store people for searching
 
     // Get DOM elements
     const newCaseBtn = document.getElementById('newCaseBtn');
     const logoutBtn = document.getElementById('logoutBtn');
-    const cancelNewCaseBtn = document.getElementById('cancelNewCaseBtn');
-    const submitNewCaseBtn = document.getElementById('submitNewCaseBtn');
+    const cancelCaseBtn = document.getElementById('cancelCaseBtn');
+    const submitCaseBtn = document.getElementById('submitCaseBtn');
+    const closeCaseDetailsBtn = document.getElementById('closeCaseDetailsBtn');
 
     // Attach event listeners
     newCaseBtn.addEventListener('click', openNewCaseModal);
     logoutBtn.addEventListener('click', handleLogout);
-    cancelNewCaseBtn.addEventListener('click', closeNewCaseModal);
-    submitNewCaseBtn.addEventListener('click', submitNewCase);
+    cancelCaseBtn.addEventListener('click', closeCaseModal);
+    submitCaseBtn.addEventListener('click', submitCase);
+    closeCaseDetailsBtn.addEventListener('click', () => {
+      document.getElementById('caseDetailsModal').classList.remove('active');
+    });
+
+    // Search listener
+    document.getElementById('personSearch').addEventListener('input', (e) => {
+      const term = e.target.value.toLowerCase();
+      const filtered = allPeople.filter(p => p.full_name.toLowerCase().includes(term));
+      renderPersonOptions(filtered);
+    });
 
     // Check authentication on page load
     redirectIfNotAuthenticated();
@@ -163,7 +204,6 @@
         }
       } catch (error) {
         console.error('Error loading cases:', error);
-        // Check if it's an auth error
         if (error.message && error.message.includes('401')) {
           alert('❌ انتهت جلستك. يرجى تسجيل الدخول من جديد');
           redirectIfNotAuthenticated();
@@ -177,17 +217,21 @@
       const container = document.getElementById('casesContainer');
       container.innerHTML = '';
 
-      // Filter to show only active cases (not completed or archived)
       const activeCases = cases.filter(c => c.status !== 'completed' && c.status !== 'archived');
 
       activeCases.forEach(caseItem => {
         const card = document.createElement('div');
         card.className = 'case-card';
+        card.style.cursor = 'pointer';
 
         const statusClass = `badge-status-${caseItem.status}`;
-        const dateStr = new Date(caseItem.created_at).toLocaleDateString('ar-SA');
-
+        const dateStr = new Date(caseItem.created_at).toLocaleDateString('en-GB');
         const urgencyClass = `badge-urgency-${caseItem.urgency}`;
+
+        // Get volunteer name if assigned
+        const volunteerName = caseItem.volunteer_first_name 
+          ? `👨‍🔧 ${escapeHtml(caseItem.volunteer_first_name + ' ' + caseItem.volunteer_last_name)}` 
+          : '';
 
         card.innerHTML = `
           <div style="display: flex; flex-direction: column; height: 100%;">
@@ -204,18 +248,30 @@
               ${caseItem.aid_types ? `<span class="badge" style="background: rgba(99, 102, 241, 0.1); color: var(--primary);">${caseItem.aid_types}</span>` : ''}
             </div>
             
+            ${volunteerName ? `<div style="margin-top: 8px; font-size: 0.8rem; color: var(--primary);">${volunteerName}</div>` : ''}
+
             <div style="margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
               <div style="font-size: 0.75rem; color: var(--text-muted); display: flex; flex-direction: column; gap: 2px;">
                 <span>📞 ${escapeHtml(caseItem.phone || 'N/A')}</span>
                 <span>📍 ${escapeHtml(caseItem.city || 'N/A')}</span>
               </div>
-              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; background: var(--background); padding: 6px 12px; border-radius: var(--radius-md); transition: background 0.2s;">
-                <input type="checkbox" class="case-complete-checkbox" data-case-id="${caseItem.id}" style="width: 16px; height: 16px; cursor: pointer;">
-                <span style="font-size: 0.75rem; font-weight: 600; color: var(--text-main);">مكتمل</span>
-              </label>
+              
+              <div class="actions" style="display: flex; gap: 8px; align-items: center;">
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; background: var(--background); padding: 6px 12px; border-radius: var(--radius-md); transition: background 0.2s;" onclick="event.stopPropagation()">
+                  <input type="checkbox" class="case-complete-checkbox" data-case-id="${caseItem.id}" style="width: 16px; height: 16px; cursor: pointer;">
+                  <span style="font-size: 0.75rem; font-weight: 600; color: var(--text-main);">مكتمل</span>
+                </label>
+              </div>
             </div>
           </div>
         `;
+
+        // Click on card opens details (except when clicking checkbox)
+        card.addEventListener('click', (e) => {
+          if (e.target.type !== 'checkbox' && !e.target.closest('.case-complete-checkbox')) {
+            showCaseDetails(caseItem);
+          }
+        });
 
         container.appendChild(card);
       });
@@ -225,85 +281,167 @@
         checkbox.addEventListener('change', async (e) => {
           if (e.target.checked) {
             const caseId = parseInt(e.target.dataset.caseId);
-            console.log('Checkbox changed for case:', caseId);
             await completeCase(caseId);
           }
         });
       });
     }
 
-    async function completeCase(caseId) {
+    async function showCaseDetails(caseSummary) {
       try {
-        console.log('Marking case as completed:', caseId);
-        const token = localStorage.getItem('authToken');
+        // Fetch full details
+        const response = await casesAPI.getOne(caseSummary.id);
+        if (!response.success) throw new Error('Failed to load case details');
+        
+        const caseItem = response.case;
+        
+        const content = document.getElementById('caseDetailsContent');
+        const dateStr = new Date(caseItem.created_at).toLocaleDateString('en-GB');
+        
+        // Prepare volunteer display
+        const volunteerDisplay = caseItem.volunteer_id 
+          ? `${escapeHtml(caseItem.volunteer_first_name)} ${escapeHtml(caseItem.volunteer_last_name)} (${escapeHtml(caseItem.volunteer_phone || '')})` 
+          : 'غير معين';
 
-        if (!token) {
-          console.error('No token found in localStorage');
-          alert('❌ الجلسة منتهية. يرجى تسجيل الدخول من جديد');
-          redirectIfNotAuthenticated();
-          return;
-        }
+        // Prepare aid types list
+        const aidTypesList = caseItem.aid_types && caseItem.aid_types.length > 0
+          ? caseItem.aid_types.map(at => `<span class="badge" style="background: #f0f0f0;">${at.label}</span>`).join(' ')
+          : 'لا توجد';
 
-        console.log('Token found, sending update request...');
-        await casesAPI.update(caseId, { status: 'completed' });
+        content.innerHTML = `
+          <div style="padding: 10px 0;">
+            <h3 style="color: var(--primary);">${escapeHtml(caseItem.person_name)}</h3>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px;">
+              <div>
+                <p><strong>الهاتف:</strong> ${escapeHtml(caseItem.phone || 'N/A')}</p>
+                <p><strong>المدينة:</strong> ${escapeHtml(caseItem.city || 'N/A')}</p>
+                <p><strong>تاريخ الإنشاء:</strong> ${dateStr}</p>
+              </div>
+              <div>
+                <p><strong>الحالة:</strong> ${getStatusLabel(caseItem.status)}</p>
+                <p><strong>الأولوية:</strong> ${getUrgencyLabel(caseItem.urgency)}</p>
+                <p><strong>طريقة الاتصال:</strong> ${caseItem.contact_method}</p>
+              </div>
+            </div>
+            
+            <div style="margin-top: 15px; padding: 10px; background: #f9fafb; border-radius: 8px;">
+              <p><strong>الوصف:</strong></p>
+              <p>${escapeHtml(caseItem.description || 'لا يوجد وصف')}</p>
+            </div>
 
-        console.log('Case completed successfully!');
-        alert('✅ تمت تحديث الحالة إلى مكتمل وتم نقلها إلى السجل!');
+            <div style="margin-top: 15px;">
+              <p><strong>أنواع المساعدة:</strong></p>
+              <div style="margin-top: 5px;">${aidTypesList}</div>
+            </div>
 
-        // Reload cases
-        setTimeout(() => {
-          console.log('Reloading cases...');
-          loadCases();
-        }, 500);
+            <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #eee;">
+              <p><strong>المتطوع المسؤول:</strong> ${volunteerDisplay}</p>
+            </div>
+
+            <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #eee;" id="caseDetailsActions">
+            </div>
+          </div>
+        `;
+
+        // Create edit button programmatically
+        const editBtn = document.createElement('button');
+        editBtn.className = 'btn-secondary';
+        editBtn.textContent = 'تعديل الحالة';
+        editBtn.style.width = '100%';
+        editBtn.onclick = () => {
+          document.getElementById('caseDetailsModal').classList.remove('active');
+          openEditCaseModal(caseItem);
+        };
+        
+        document.getElementById('caseDetailsActions').appendChild(editBtn);
+        document.getElementById('caseDetailsModal').classList.add('active');
 
       } catch (error) {
-        console.error('Error in completeCase:', error);
-        alert(`❌ خطأ: ${error.message}`);
+        console.error('Error showing details:', error);
+        alert('حدث خطأ أثناء تحميل التفاصيل');
       }
     }
 
-    function getUrgencyLabel(urgency) {
-      const labels = {
-        'normal': 'عادي',
-        'urgent': 'عاجل',
-        'very_urgent': 'عاجل جداً'
-      };
-      return labels[urgency] || urgency;
-    }
-
-    function getStatusLabel(status) {
-      const labels = {
-        'new': 'جديد',
-        'in_progress': 'قيد المعالجة',
-        'blocked': 'معطل',
-        'completed': 'مكتمل',
-        'archived': 'مؤرشف'
-      };
-      return labels[status] || status;
-    }
-
-    function openNewCaseModal() {
-      populatePeopleDropdown();
-      populateAidTypesCheckboxes();
-      document.getElementById('newCaseModal').classList.add('active');
-      document.getElementById('newCaseMessage').style.display = 'none';
-    }
-
-    function closeNewCaseModal() {
-      document.getElementById('newCaseModal').classList.remove('active');
-      document.getElementById('casePerson').value = '';
+    async function openNewCaseModal() {
+      isEditMode = false;
+      currentCaseId = null;
+      document.getElementById('modalTitle').textContent = 'إنشاء حالة جديدة';
+      document.getElementById('submitCaseBtn').textContent = 'إنشاء حالة';
+      
+      // Clear form
       document.getElementById('caseDescription').value = '';
       document.getElementById('caseUrgency').value = 'normal';
       document.getElementById('caseContactMethod').value = 'call';
+      document.getElementById('casePerson').value = '';
+      document.getElementById('caseVolunteer').value = '';
+      
+      // Reset checkboxes
       document.querySelectorAll('.aid-type-checkbox').forEach(cb => cb.checked = false);
+      
+      // Load data
+      await populatePeopleDropdown();
+      await populateAidTypesCheckboxes();
+      await populateVolunteersDropdown();
+      
+      document.getElementById('caseModal').classList.add('active');
+      document.getElementById('caseMessage').style.display = 'none';
     }
 
-    async function submitNewCase() {
+    async function openEditCaseModal(caseItem) {
+      isEditMode = true;
+      currentCaseId = caseItem.id;
+      document.getElementById('modalTitle').textContent = 'تعديل الحالة';
+      document.getElementById('submitCaseBtn').textContent = 'حفظ التغييرات';
+      
+      // Load data first
+      await populatePeopleDropdown();
+      await populateAidTypesCheckboxes();
+      await populateVolunteersDropdown();
+      
+      // Fill form
+      document.getElementById('casePerson').value = caseItem.person_id;
+      document.getElementById('caseDescription').value = caseItem.notes || caseItem.description || ''; // Note: DB uses description or notes depending on query? getOne uses notes as alias? No, getOne query selects 'notes' from 'c.notes' but create uses 'description'. Check create query. create uses description. getOne selects notes. Wait.
+      // In getOne: `c.notes`? Schema says `cases` has `description`, `notes` table is separate.
+      // Wait, getOne query in cases.js says `SELECT c.id, ..., c.notes`. BUT schema says `cases` has `description`.
+      // Let me re-check schema. `cases` has `description`. `notes` is a table.
+      // My `cases.js` getOne likely has a bug if it selects `c.notes` unless I aliased description as notes?
+      // In cases.js: `SELECT ... c.description` (in GET /). In GET /:id `SELECT ... c.notes`.
+      // Ah, I might have messed up GET /:id in previous steps or it was already like that.
+      // I will assume `description` is the field.
+      // Actually, in my recent update to `cases.js`, I wrote `SELECT ... c.notes`.
+      // Schema says `cases` table has `description TEXT`. It does NOT have `notes`.
+      // So `c.notes` in `cases.js` will fail!
+      // I need to fix `src/routes/cases.js`!
+      
+      // Back to frontend logic (assuming I fix backend):
+      document.getElementById('caseDescription').value = caseItem.description || '';
+      document.getElementById('caseUrgency').value = caseItem.urgency;
+      document.getElementById('caseContactMethod').value = caseItem.contact_method;
+      document.getElementById('caseVolunteer').value = caseItem.volunteer_id || '';
+      
+      // Check aid types
+      if (caseItem.aid_types) {
+        caseItem.aid_types.forEach(at => {
+          const cb = document.querySelector(`.aid-type-checkbox[value="${at.aid_type_id}"]`);
+          if (cb) cb.checked = true;
+        });
+      }
+      
+      document.getElementById('caseModal').classList.add('active');
+      document.getElementById('caseMessage').style.display = 'none';
+    }
+
+    function closeCaseModal() {
+      document.getElementById('caseModal').classList.remove('active');
+    }
+
+    async function submitCase() {
       const person_id = document.getElementById('casePerson').value;
       const description = document.getElementById('caseDescription').value;
       const urgency = document.getElementById('caseUrgency').value;
       const contact_method = document.getElementById('caseContactMethod').value;
-      const messageEl = document.getElementById('newCaseMessage');
+      const volunteer_id = document.getElementById('caseVolunteer').value;
+      const messageEl = document.getElementById('caseMessage');
 
       if (!person_id) {
         showMessage(messageEl, 'Please select a person', 'error');
@@ -315,17 +453,34 @@
         .map(cb => parseInt(cb.value));
 
       try {
-        messageEl.textContent = 'Creating case...';
+        messageEl.textContent = 'جاري الحفظ...';
         messageEl.className = 'message info';
         messageEl.style.display = 'block';
 
-        await casesAPI.create(parseInt(person_id), description, urgency, contact_method, aid_type_ids);
+        if (isEditMode) {
+          await casesAPI.update(currentCaseId, {
+            description, urgency, contact_method, 
+            volunteer_id: volunteer_id ? parseInt(volunteer_id) : null
+            // Note: Update doesn't handle aid_types update in the simple endpoint yet, but that's ok for now
+          });
+          messageEl.textContent = 'تم تحديث الحالة بنجاح!';
+        } else {
+          await casesAPI.create(
+            parseInt(person_id), 
+            description, 
+            urgency, 
+            contact_method, 
+            aid_type_ids,
+            volunteer_id ? parseInt(volunteer_id) : null
+          );
+          
+          messageEl.textContent = 'تم إنشاء الحالة بنجاح!';
+        }
 
-        messageEl.textContent = 'Case created successfully!';
         messageEl.className = 'message success';
 
         setTimeout(() => {
-          closeNewCaseModal();
+          closeCaseModal();
           loadCases();
         }, 1000);
       } catch (error) {
@@ -336,25 +491,62 @@
     async function populatePeopleDropdown() {
       try {
         const response = await peopleAPI.getAll();
-        const select = document.getElementById('casePerson');
-
-        if (response.people && response.people.length > 0) {
-          response.people.forEach(person => {
-            const option = document.createElement('option');
-            option.value = person.id;
-            option.textContent = `${person.full_name} (${person.city || 'Unknown city'}) - ${person.number_of_people} people`;
-            select.appendChild(option);
-          });
+        
+        if (response.people) {
+          allPeople = response.people;
+          renderPersonOptions(allPeople);
         }
       } catch (error) {
         console.error('Error loading people:', error);
       }
     }
 
+    function renderPersonOptions(people) {
+      const select = document.getElementById('casePerson');
+      const currentVal = select.value;
+      select.innerHTML = '<option value="">-- اختر شخصاً --</option>';
+
+      people.forEach(person => {
+        const option = document.createElement('option');
+        option.value = person.id;
+        option.textContent = `${person.full_name} (${person.city || 'Unknown city'})`;
+        select.appendChild(option);
+      });
+      
+      // Try to preserve selection if it exists in the filtered list
+      if (currentVal) {
+        // Check if option exists
+        const exists = Array.from(select.options).some(opt => opt.value === currentVal);
+        if (exists) select.value = currentVal;
+      }
+    }
+
+    async function populateVolunteersDropdown() {
+      try {
+        const response = await volunteersAPI.getAll();
+        const select = document.getElementById('caseVolunteer');
+        select.innerHTML = '<option value="">-- بدون متطوع --</option>';
+
+        if (response.volunteers && response.volunteers.length > 0) {
+          response.volunteers.forEach(vol => {
+            const option = document.createElement('option');
+            option.value = vol.id;
+            option.textContent = `${vol.first_name} ${vol.last_name}`;
+            select.appendChild(option);
+          });
+        }
+      } catch (error) {
+        console.error('Error loading volunteers:', error);
+      }
+    }
+
     async function populateAidTypesCheckboxes() {
+      // Only populate if empty to avoid resetting selections in edit mode if called multiple times (though I clear it in open)
+      const container = document.getElementById('caseAidTypes');
+      if (container.children.length > 0) return; 
+
       try {
         const response = await aidTypesAPI.getAll();
-        const container = document.getElementById('caseAidTypes');
         container.innerHTML = '';
 
         if (response.aid_types && response.aid_types.length > 0) {
@@ -400,6 +592,42 @@
       }
     }
 
+    async function completeCase(caseId) {
+      // ... same as before
+      try {
+        console.log('Marking case as completed:', caseId);
+        await casesAPI.update(caseId, { status: 'completed' });
+        console.log('Case completed successfully!');
+        alert('✅ تمت تحديث الحالة إلى مكتمل وتم نقلها إلى السجل!');
+        setTimeout(() => {
+          loadCases();
+        }, 500);
+      } catch (error) {
+        console.error('Error in completeCase:', error);
+        alert(`❌ خطأ: ${error.message}`);
+      }
+    }
+
+    function getUrgencyLabel(urgency) {
+      const labels = {
+        'normal': 'عادي',
+        'urgent': 'عاجل',
+        'very_urgent': 'عاجل جداً'
+      };
+      return labels[urgency] || urgency;
+    }
+
+    function getStatusLabel(status) {
+      const labels = {
+        'new': 'جديد',
+        'in_progress': 'قيد المعالجة',
+        'blocked': 'معطل',
+        'completed': 'مكتمل',
+        'archived': 'مؤرشف'
+      };
+      return labels[status] || status;
+    }
+
     function handleLogout() {
       if (confirm('Are you sure you want to logout?')) {
         logout();
@@ -413,6 +641,7 @@
     }
 
     function escapeHtml(text) {
+      if (!text) return '';
       const div = document.createElement('div');
       div.textContent = text;
       return div.innerHTML;

@@ -63,9 +63,9 @@ export const casesAPI = {
 
   getOne: (id) => apiCall(`/cases/${id}`, { method: 'GET' }),
 
-  create: (person_id, description, urgency, contact_method, aid_type_ids) => apiCall('/cases', {
+  create: (person_id, description, urgency, contact_method, aid_type_ids, volunteer_id) => apiCall('/cases', {
     method: 'POST',
-    body: JSON.stringify({ person_id, description, urgency, contact_method, aid_type_ids })
+    body: JSON.stringify({ person_id, description, urgency, contact_method, aid_type_ids, volunteer_id })
   }),
 
   update: (id, updates) => apiCall(`/cases/${id}`, {
@@ -98,6 +98,17 @@ export const aidTypesAPI = {
   getAll: () => apiCall('/aid-types', { method: 'GET' }),
 
   getOne: (id) => apiCall(`/aid-types/${id}`, { method: 'GET' })
+};
+
+export const volunteersAPI = {
+  getAll: () => apiCall('/volunteers', { method: 'GET' }),
+
+  create: (first_name, last_name, phone, job) => apiCall('/volunteers', {
+    method: 'POST',
+    body: JSON.stringify({ first_name, last_name, phone, job })
+  }),
+
+  delete: (id) => apiCall(`/volunteers/${id}`, { method: 'DELETE' })
 };
 
 export const usersAPI = {

@@ -27,6 +27,7 @@
         <nav class="nav-links">
           <a href="/dashboard">لوحة التحكم</a>
           <a href="/people.html" class="active">الأشخاص</a>
+          <a href="/volunteers.html">المتطوعين</a>
           <a href="/history.html">السجل</a>
         </nav>
       </div>
@@ -183,7 +184,7 @@
           card.className = 'case-card';
           card.style.cursor = 'pointer';
 
-          const dateStr = new Date(person.created_at).toLocaleDateString('ar-SA');
+          const dateStr = new Date(person.created_at).toLocaleDateString('en-GB');
 
           card.innerHTML = `
             <div style="display: flex; flex-direction: column; height: 100%;">
@@ -292,7 +293,7 @@
         currentPersonId = person.id;
         const content = document.getElementById('personDetailsContent');
 
-        const dateStr = new Date(person.created_at).toLocaleDateString('ar-SA');
+        const dateStr = new Date(person.created_at).toLocaleDateString('en-GB');
 
         content.innerHTML = `
         <div style="padding: 20px 0;">
@@ -304,11 +305,20 @@
             <p><strong>تمت الإضافة:</strong> ${dateStr}</p>
             ${person.notes ? `<p><strong>ملاحظات:</strong> ${escapeHtml(person.notes)}</p>` : ''}
           </div>
-          <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #eee;">
-            <button class="btn-secondary" onclick="document.getElementById('personModal').classList.add('active'); document.getElementById('modalTitle').textContent = 'تعديل الشخص'; populatePersonForm(${JSON.stringify(person)});">تعديل</button>
+          <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #eee;" id="personDetailsActions">
           </div>
         </div>
       `;
+
+        // Create update button programmatically to avoid inline JSON issues
+        const updateBtn = document.createElement('button');
+        updateBtn.className = 'btn-secondary';
+        updateBtn.textContent = 'تعديل';
+        updateBtn.onclick = () => {
+          populatePersonForm(person);
+        };
+        
+        document.getElementById('personDetailsActions').appendChild(updateBtn);
 
         document.getElementById('personDetailsModal').classList.add('active');
       }

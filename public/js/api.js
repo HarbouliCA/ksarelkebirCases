@@ -4,7 +4,7 @@ const getApiBase = () => {
   if (window.location.hostname.includes('vercel.app') || 
       window.location.hostname === 'ksarapp.sagafit.es') {
     // Replace with your actual Railway URL after deployment
-    return 'https://ksarelkebirCases-production.up.railway.app/api';
+    return 'https://ksarelkebircases-production-19fd.up.railway.app/api';
   }
   // Development: Use relative path (localhost:3000)
   return '/api';

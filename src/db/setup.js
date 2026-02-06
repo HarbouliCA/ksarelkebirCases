@@ -1,14 +1,12 @@
 import pkg from 'pg';
 const { Client } = pkg;
-import dotenv from 'dotenv';
+import '../config/env.js';
 import ConnectionString from 'pg-connection-string';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-dotenv.config();
 
 // Parse connection string
 const cs = new ConnectionString(process.env.DATABASE_URL);

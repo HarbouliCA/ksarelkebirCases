@@ -1,9 +1,10 @@
 import pkg from 'pg';
 const { Pool } = pkg;
-import 'dotenv/config';
+import '../config/env.js';
 
-// Initialize pool without connection string immediately
-// We'll pass it when needed or let pg handle it from environment
+// Global bypass for self-signed certificates (required for Aiven/Railway)
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+
 const poolConfig = {
   connectionString: process.env.DATABASE_URL,
   ssl: {

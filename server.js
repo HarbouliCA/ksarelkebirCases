@@ -17,38 +17,34 @@ import caseAidTypesRoutes from './src/routes/case-aid-types.js';
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Simple CORS - Allow all origins temporarily for debugging
+// CRITICAL: Handle OPTIONS requests FIRST, before ANY other middleware
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   
-  // Log every request
-  console.log('Incoming request:', {
-    method: req.method,
-    path: req.path,
-    origin: origin
-  });
-
-  // Set CORS headers manually
-  res.header('Access-Control-Allow-Origin', origin || '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Max-Age', '86400');
-
-  // Handle preflight
+  // Always set CORS headers for every request
+  if (origin) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Max-Age', '86400');
+  
+  // Handle preflight OPTIONS requests immediately
   if (req.method === 'OPTIONS') {
-    console.log('Preflight request received for:', req.path);
+    console.log(`✅ Preflight request handled for ${req.path} from ${origin}`);
     return res.status(204).end();
   }
-
+  
   next();
 });
 
-// Helmet configuration - disabled temporarily for debugging
-// app.use(helmet({
-//   crossOriginResourcePolicy: { policy: "cross-origin" },
-//   crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
-// }));
+// Now apply other middleware
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
+  contentSecurityPolicy: false // Disable for API
+}));
 
 app.use(morgan('combined')); // Request logging
 app.use(express.json()); // Parse JSON bodies
@@ -101,6 +97,7 @@ async function start() {
   try {
     console.log('🔄 Attempting database connection...');
     await connectDB();
+    console.log(`✅ Database connected at: ${new Date().toISOString()}`);
     console.log('✅ Database connected');
 
     app.listen(PORT, () => {

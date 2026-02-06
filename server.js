@@ -19,14 +19,25 @@ const PORT = process.env.PORT || 3000;
 
 // CORS Configuration - Allow frontend from various domains
 const corsOptions = {
-  origin: [
-    'http://localhost:3000',
-    'http://localhost:3001',
-    'http://localhost:5173', // Vite default
-    'https://ksarelkebirCases.vercel.app',
-    'https://ksarelkebir-cases.vercel.app',
-    'https://ksarapp.sagafit.es',
-  ],
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    const allowedOrigins = [
+      'http://localhost:3000',
+      'http://localhost:3001',
+      'http://localhost:5173',
+      'https://ksarapp.sagafit.es'
+    ];
+    
+    // Check if origin is allowed or is a Vercel app
+    if (allowedOrigins.indexOf(origin) !== -1 || origin.endsWith('.vercel.app')) {
+      callback(null, true);
+    } else {
+      console.log('Blocked by CORS:', origin);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
@@ -34,6 +45,9 @@ const corsOptions = {
 };
 
 // Middleware
+app.use(cors(corsOptions)); // Enable CORS with specific origins
+app.options('*', cors(corsOptions)); // Enable pre-flight for all routes
+
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
@@ -45,7 +59,6 @@ app.use(helmet({
     },
   },
 })); // Security headers with relaxed CSP for development
-app.use(cors(corsOptions)); // Enable CORS with specific origins
 app.use(morgan('combined')); // Request logging
 app.use(express.json()); // Parse JSON bodies
 app.use(express.urlencoded({ extended: true })); // Parse form data

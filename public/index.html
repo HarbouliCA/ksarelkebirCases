@@ -114,7 +114,7 @@
         messageEl.className = 'message success';
 
         setTimeout(() => {
-          window.location.href = '/dashboard';
+          window.location.href = window.location.origin + '/dashboard.html';
         }, 1000);
       } catch (error) {
         showMessage(messageEl, error.message, 'error');

@@ -17,56 +17,38 @@ import caseAidTypesRoutes from './src/routes/case-aid-types.js';
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// CORS Configuration - Allow frontend from various domains
-const corsOptions = {
-  origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-    
-    const allowedOrigins = [
-      'http://localhost:3000',
-      'http://localhost:3001',
-      'http://localhost:5173',
-      'https://ksarapp.sagafit.es',
-      'https://ksarelkebir-cases.vercel.app',
-      ...(process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : [])
-    ];
-    
-    // Check if origin is allowed or is a Vercel app
-    if (allowedOrigins.indexOf(origin) !== -1 || origin.endsWith('.vercel.app')) {
-      callback(null, true);
-    } else {
-      console.log('Blocked by CORS:', origin);
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
-  exposedHeaders: ['Content-Range', 'X-Content-Range'],
-  optionsSuccessStatus: 204,
-  maxAge: 86400 // 24 hours
-};
+// Simple CORS - Allow all origins temporarily for debugging
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  
+  // Log every request
+  console.log('Incoming request:', {
+    method: req.method,
+    path: req.path,
+    origin: origin
+  });
 
-// CRITICAL: Apply CORS BEFORE helmet and other middleware
-app.use(cors(corsOptions));
-app.options('*', cors(corsOptions)); // Enable pre-flight for all routes
+  // Set CORS headers manually
+  res.header('Access-Control-Allow-Origin', origin || '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Max-Age', '86400');
 
-// Helmet configuration - must come AFTER CORS
-app.use(helmet({
-  crossOriginResourcePolicy: { policy: "cross-origin" },
-  crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'"],
-      scriptSrcAttr: ["'unsafe-inline'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      imgSrc: ["'self'", "data:"],
-      connectSrc: ["'self'", "https://ksarelkebir-cases.vercel.app", "https://*.vercel.app"],
-    },
-  },
-}));
+  // Handle preflight
+  if (req.method === 'OPTIONS') {
+    console.log('Preflight request received for:', req.path);
+    return res.status(204).end();
+  }
+
+  next();
+});
+
+// Helmet configuration - disabled temporarily for debugging
+// app.use(helmet({
+//   crossOriginResourcePolicy: { policy: "cross-origin" },
+//   crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
+// }));
 
 app.use(morgan('combined')); // Request logging
 app.use(express.json()); // Parse JSON bodies

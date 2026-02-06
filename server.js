@@ -17,27 +17,23 @@ import caseAidTypesRoutes from './src/routes/case-aid-types.js';
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// CRITICAL: Handle OPTIONS requests FIRST, before ANY other middleware
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  
-  // Always set CORS headers for every request
-  if (origin) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-  }
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Max-Age', '86400');
-  
-  // Handle preflight OPTIONS requests immediately
-  if (req.method === 'OPTIONS') {
-    console.log(`✅ Preflight request handled for ${req.path} from ${origin}`);
-    return res.status(204).end();
-  }
-  
-  next();
-});
+// Simple CORS configuration using cors package
+const corsOptions = {
+  origin: true, // Allow all origins temporarily for debugging
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+  exposedHeaders: ['Content-Range', 'X-Content-Range'],
+  optionsSuccessStatus: 204,
+  maxAge: 86400,
+  preflightContinue: false
+};
+
+// Apply CORS first
+app.use(cors(corsOptions));
+
+// Explicitly handle OPTIONS
+app.options('*', cors(corsOptions));
 
 // Now apply other middleware
 app.use(helmet({

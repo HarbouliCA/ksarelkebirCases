@@ -100,9 +100,10 @@ async function start() {
     console.log(`✅ Database connected at: ${new Date().toISOString()}`);
     console.log('✅ Database connected');
 
-    app.listen(PORT, () => {
-      console.log(`\n🚀 Server running at http://localhost:${PORT}`);
-      console.log(`📱 Frontend: http://localhost:${PORT}`);
+    // CRITICAL: Bind to 0.0.0.0 for Railway (not localhost)
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`\n🚀 Server running on port ${PORT}`);
+      console.log(`📱 Listening on: 0.0.0.0:${PORT}`);
       console.log(`🔌 API: http://localhost:${PORT}/api`);
       console.log(`🏥 Health check: http://localhost:${PORT}/api/health`);
       console.log(`\n💡 Environment: ${process.env.NODE_ENV || 'development'}\n`);
@@ -118,9 +119,10 @@ async function start() {
     console.log('📝 Development mode: Starting server without database connection');
     console.log('⚠️  API endpoints will fail until database is configured\n');
 
-    app.listen(PORT, () => {
-      console.log(`\n🚀 Server running at http://localhost:${PORT}`);
-      console.log(`📱 Frontend: http://localhost:${PORT}`);
+    // CRITICAL: Bind to 0.0.0.0 for Railway (not localhost)
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`\n🚀 Server running on port ${PORT}`);
+      console.log(`📱 Listening on: 0.0.0.0:${PORT}`);
       console.log(`🔌 API: http://localhost:${PORT}/api (requires database)`);
       console.log(`🏥 Health check: http://localhost:${PORT}/api/health`);
       console.log(`\n💡 Environment: ${process.env.NODE_ENV || 'development'}`);

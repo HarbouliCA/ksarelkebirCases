@@ -3,32 +3,32 @@
   "outputDirectory": "public",
   "routes": [
     {
-      "src": "/index.html",
-      "dest": "/index.html"
+      "source": "/index.html",
+      "destination": "/index.html"
     },
     {
-      "src": "/dashboard.html",
-      "dest": "/dashboard.html"
+      "source": "/dashboard.html",
+      "destination": "/dashboard.html"
     },
     {
-      "src": "/people.html",
-      "dest": "/people.html"
+      "source": "/people.html",
+      "destination": "/people.html"
     },
     {
-      "src": "/history.html",
-      "dest": "/history.html"
+      "source": "/history.html",
+      "destination": "/history.html"
     },
     {
-      "src": "/css/(.*)",
-      "dest": "/css/$1"
+      "source": "/css/(.*)",
+      "destination": "/css/$1"
     },
     {
-      "src": "/js/(.*)",
-      "dest": "/js/$1"
+      "source": "/js/(.*)",
+      "destination": "/js/$1"
     },
     {
-      "src": "/(.*)",
-      "dest": "/index.html"
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ]
 }

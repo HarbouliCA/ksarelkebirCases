@@ -27,7 +27,9 @@ const corsOptions = {
       'http://localhost:3000',
       'http://localhost:3001',
       'http://localhost:5173',
-      'https://ksarapp.sagafit.es'
+      'https://ksarapp.sagafit.es',
+      'https://ksarelkebir-cases.vercel.app',
+      ...(process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : [])
     ];
     
     // Check if origin is allowed or is a Vercel app

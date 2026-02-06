@@ -1,34 +1,16 @@
 {
-  "buildCommand": "echo 'Frontend deployment'",
-  "outputDirectory": "public",
-  "routes": [
-    {
-      "source": "/index.html",
-      "destination": "/index.html"
+  "rewrites": [
+    { 
+      "source": "/dashboard", 
+      "destination": "/dashboard.html" 
     },
-    {
-      "source": "/dashboard.html",
-      "destination": "/dashboard.html"
+    { 
+      "source": "/people", 
+      "destination": "/people.html" 
     },
-    {
-      "source": "/people.html",
-      "destination": "/people.html"
-    },
-    {
-      "source": "/history.html",
-      "destination": "/history.html"
-    },
-    {
-      "source": "/css/(.*)",
-      "destination": "/css/$1"
-    },
-    {
-      "source": "/js/(.*)",
-      "destination": "/js/$1"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/index.html"
+    { 
+      "source": "/history", 
+      "destination": "/history.html" 
     }
   ]
 }

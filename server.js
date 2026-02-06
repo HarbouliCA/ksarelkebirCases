@@ -17,37 +17,42 @@ import caseAidTypesRoutes from './src/routes/case-aid-types.js';
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Simple CORS configuration using cors package
-const corsOptions = {
-  origin: true, // Allow all origins temporarily for debugging
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
-  exposedHeaders: ['Content-Range', 'X-Content-Range'],
-  optionsSuccessStatus: 204,
-  maxAge: 86400,
-  preflightContinue: false
-};
+// Prevent crashes
+process.on('uncaughtException', (error) => {
+  console.error('❌ Uncaught Exception:', error);
+});
 
-// Apply CORS first
-app.use(cors(corsOptions));
+process.on('unhandledRejection', (reason) => {
+  console.error('❌ Unhandled Rejection:', reason);
+});
 
-// Explicitly handle OPTIONS
-app.options('*', cors(corsOptions));
+// CORS - handle at the absolute top
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  
+  console.log(`${req.method} ${req.url} from ${req.headers.origin || 'direct'}`);
+  
+  if (req.method === 'OPTIONS') {
+    console.log(`✅ OPTIONS: ${req.url}`);
+    return res.sendStatus(204);
+  }
+  next();
+});
 
-// Now apply other middleware
-app.use(helmet({
-  crossOriginResourcePolicy: { policy: "cross-origin" },
-  crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
-  contentSecurityPolicy: false // Disable for API
-}));
+app.use(cors({ origin: true, credentials: true }));
 
-app.use(morgan('combined')); // Request logging
-app.use(express.json()); // Parse JSON bodies
-app.use(express.urlencoded({ extended: true })); // Parse form data
-
-// Serve static frontend files
+app.use(morgan('combined'));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.use(express.static('public'));
+
+// Health check FIRST
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'OK', time: new Date().toISOString() });
+});
 
 // API Routes
 app.use('/api/auth', authRoutes);
@@ -59,79 +64,62 @@ app.use('/api/notes', notesRoutes);
 app.use('/api/case-history', caseHistoryRoutes);
 app.use('/api/case-aid-types', caseAidTypesRoutes);
 
-// Health check endpoint
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', time: new Date().toISOString() });
-});
-
-// Serve index.html for root path (SPA support)
-app.get('/', (req, res) => {
-  res.sendFile('public/index.html', { root: '.' });
-});
-
-// Serve dashboard.html for /dashboard
-app.get('/dashboard', (req, res) => {
-  res.sendFile('public/dashboard.html', { root: '.' });
-});
-
-// Serve people.html for /people
-app.get('/people.html', (req, res) => {
-  res.sendFile('public/people.html', { root: '.' });
-});
-
-// Serve history.html for /history
-app.get('/history.html', (req, res) => {
-  res.sendFile('public/history.html', { root: '.' });
-});
+// Static pages
+app.get('/', (req, res) => res.sendFile('public/index.html', { root: '.' }));
+app.get('/dashboard', (req, res) => res.sendFile('public/dashboard.html', { root: '.' }));
+app.get('/people.html', (req, res) => res.sendFile('public/people.html', { root: '.' }));
+app.get('/history.html', (req, res) => res.sendFile('public/history.html', { root: '.' }));
 
 // Error handling
 app.use(notFoundHandler);
-app.use(errorHandler);
+app.use((err, req, res, next) => {
+  console.error('Error:', err);
+  res.status(500).json({ error: 'Internal server error' });
+});
 
-// Start server
+// Start server - NEVER exit on error
 async function start() {
+  let dbConnected = false;
+  
   try {
-    console.log('🔄 Attempting database connection...');
+    console.log('🔄 Connecting to database...');
     await connectDB();
-    console.log(`✅ Database connected at: ${new Date().toISOString()}`);
     console.log('✅ Database connected');
-
-    // CRITICAL: Bind to 0.0.0.0 for Railway (not localhost)
-    app.listen(PORT, '0.0.0.0', () => {
-      console.log(`\n🚀 Server running on port ${PORT}`);
-      console.log(`📱 Listening on: 0.0.0.0:${PORT}`);
-      console.log(`🔌 API: http://localhost:${PORT}/api`);
-      console.log(`🏥 Health check: http://localhost:${PORT}/api/health`);
-      console.log(`\n💡 Environment: ${process.env.NODE_ENV || 'development'}\n`);
-    });
+    dbConnected = true;
   } catch (error) {
-    console.error('⚠️  Database connection error:', error.message);
-
-    if (process.env.NODE_ENV === 'production') {
-      console.error('❌ Production mode: Cannot start without database');
-      process.exit(1);
-    }
-
-    console.log('📝 Development mode: Starting server without database connection');
-    console.log('⚠️  API endpoints will fail until database is configured\n');
-
-    // CRITICAL: Bind to 0.0.0.0 for Railway (not localhost)
-    app.listen(PORT, '0.0.0.0', () => {
-      console.log(`\n🚀 Server running on port ${PORT}`);
-      console.log(`📱 Listening on: 0.0.0.0:${PORT}`);
-      console.log(`🔌 API: http://localhost:${PORT}/api (requires database)`);
-      console.log(`🏥 Health check: http://localhost:${PORT}/api/health`);
-      console.log(`\n💡 Environment: ${process.env.NODE_ENV || 'development'}`);
-      console.log(`📋 To setup database: npm run setup-db\n`);
-    });
+    console.error('⚠️ Database failed:', error.message);
+    console.log('⚠️ Starting anyway - DB routes will fail');
   }
+
+  const server = app.listen(PORT, '0.0.0.0', () => {
+    console.log('='.repeat(50));
+    console.log('🚀 SERVER RUNNING');
+    console.log(`Port: ${PORT}`);
+    console.log(`Host: 0.0.0.0`);
+    console.log(`DB: ${dbConnected ? '✅' : '❌'}`);
+    console.log(`Env: ${process.env.NODE_ENV || 'dev'}`);
+    console.log('='.repeat(50));
+  });
+
+  server.on('error', (error) => {
+    console.error('❌ Server error:', error);
+  });
 }
 
-// Graceful shutdown
 process.on('SIGTERM', async () => {
-  console.log('\n⏹️  Shutting down gracefully...');
-  await disconnectDB();
+  console.log('Shutting down...');
+  try {
+    await disconnectDB();
+  } catch (e) {
+    console.error('Disconnect error:', e);
+  }
   process.exit(0);
 });
 
-start();
+start().catch((error) => {
+  console.error('❌ Start failed:', error);
+  // Don't exit - try to start anyway
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Emergency start on port ${PORT}`);
+  });
+});
